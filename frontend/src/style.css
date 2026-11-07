@@ -127,21 +127,6 @@
     border: 1px solid var(--color-line);
   }
 
-  .brand-gradient {
-    background-image:
-      radial-gradient(1200px 600px at 12% -10%, #2f5bea 0%, transparent 55%),
-      radial-gradient(900px 600px at 88% 8%, #12876f 0%, transparent 50%),
-      linear-gradient(160deg, #101a3a 0%, #0b1220 60%, #0a1017 100%);
-  }
-
-  .grid-noise {
-    background-image:
-      linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: radial-gradient(circle at 30% 20%, #000 20%, transparent 75%);
-  }
-
   .scroll-slim {
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-strong) transparent;

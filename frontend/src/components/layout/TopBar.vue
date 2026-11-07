@@ -115,7 +115,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       <span class="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand text-white shadow-[0_2px_8px_-2px_rgb(47_91_234/0.6)]">
         <Mail class="h-4 w-4" />
       </span>
-      <span class="hidden text-[14.5px] font-semibold tracking-tight text-ink sm:block">邮局</span>
+      <span class="hidden text-[14.5px] font-semibold tracking-tight text-ink sm:block">Khavit邮局</span>
     </RouterLink>
 
     <!-- 搜索 -->

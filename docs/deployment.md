@@ -232,5 +232,7 @@ curl -fsSk https://127.0.0.1:443/healthz/live && echo OK   # 4. 健康检查
 - [ ] `data/` 权限 700，备份文件不入版本库（`.gitignore` 已排除）
 - [ ] 管理员账号开 2FA（若版本支持）或使用强密码短语
 - [ ] Nginx 已加 HSTS / CSP / `X-Frame-Options`
-- [ ] 前端凭据只存 `sessionStorage`，不写 `localStorage`
+- [ ] 前端凭据按需持久化：`localStorage` 里存的是 Basic 认证凭据（明文），
+      只在个人设备上用；公用机器先「退出登录」清掉，或把 `frontend/src/utils/storage.ts`
+      里的 `writeSession` 改回 `sessionStorage`
 - [ ] 不给 `allowRelaying` 打开（开放中继会被滥用）

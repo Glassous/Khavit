@@ -1,6 +1,6 @@
 /**
- * 凭据只放 sessionStorage：刷新页面保持登录，关闭标签即失效。
- * 绝不写 localStorage、不进 URL、不打日志。
+ * 登录状态持久化：凭据写 localStorage，刷新、关掉浏览器再打开都保持登录，直到点「退出登录」。
+ * 只落在本机当前浏览器里，不进 URL、不打日志；退出登录会立刻清除。
  */
 
 const SESSION_KEY = 'postal.auth.v1'
@@ -13,8 +13,19 @@ export interface StoredSession {
   pass: string
 }
 
+/** 读取凭据；旧版本只写了 sessionStorage，这里顺带迁移成持久化存储 */
+function readRawSession(): string | null {
+  const legacy = sessionStorage.getItem(SESSION_KEY)
+  if (legacy) {
+    sessionStorage.removeItem(SESSION_KEY)
+    localStorage.setItem(SESSION_KEY, legacy)
+    return legacy
+  }
+  return localStorage.getItem(SESSION_KEY)
+}
+
 export function readSession(): StoredSession | null {
-  const raw = sessionStorage.getItem(SESSION_KEY)
+  const raw = readRawSession()
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as StoredSession
@@ -22,16 +33,17 @@ export function readSession(): StoredSession | null {
     return parsed
   } catch {
     console.error('[storage] 会话数据损坏，已清除')
-    sessionStorage.removeItem(SESSION_KEY)
+    clearSession()
     return null
   }
 }
 
 export function writeSession(session: StoredSession): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
 }
 
 export function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY)
   sessionStorage.removeItem(SESSION_KEY)
 }
 

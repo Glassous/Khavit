@@ -43,7 +43,8 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
-      meta: { public: true, title: '登录' },
+      // 不设 title：登录页的标签页就叫 Khavit邮局
+      meta: { public: true },
     },
     {
       path: '/',
@@ -98,9 +99,11 @@ router.beforeEach(async (to) => {
   return true
 })
 
+const APP_NAME = 'Khavit邮局'
+
 router.afterEach((to) => {
-  const title = (to.meta.title as string) || '邮局'
-  document.title = title === '邮局' ? '邮局' : `${title} · 邮局`
+  const title = (to.meta.title as string) || ''
+  document.title = title ? `${title} · ${APP_NAME}` : APP_NAME
 })
 
 export default router
