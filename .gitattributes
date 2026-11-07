@@ -1,0 +1,2 @@
+# Windows 上开发也别让 shell 脚本带上 CRLF，否则服务器上执行会炸
+*.sh text eol=lf

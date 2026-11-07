@@ -1,21 +1,22 @@
 name: deploy
 
-# 构建 → 镜像经腾讯云 COS(广州) 中转 → 服务器从 COS 拉取并部署
+# 构建 → 镜像推送到腾讯云容器镜像服务（个人版）→ 服务器拉取并部署
 #
-# 为什么用 COS 中转：服务器在国内、带宽低，GitHub Runner 直传服务器很容易断；
-# 先上传到广州 COS，服务器再走内网 endpoint 拉取（同地域腾讯云机器免公网流量、速度快）。
+# 镜像走 registry 而不是 COS tar 包：registry 按 layer 去重，镜像不变时 push/pull 几乎零流量；
+# 服务器（腾讯云 CVM）与个人版仓库同账号时走内网拉取，免公网流量费。
+#
+# 远端执行方式：所有部署逻辑在 deploy/scripts/remote-deploy.sh 里，
+# scp 上传后 ssh-action 只发一行命令执行。
+# （不要把长脚本内联在 script 里：drone-ssh 传输时会破坏内容——
+#   heredoc 缩进被剥掉、长脚本静默截断，都实测踩过。）
 #
 # 需要的仓库 Secret / Variable（Settings → Secrets and variables → Actions）：
-#   SSH_HOST      服务器地址（IP 或域名）
-#   SSH_USER      登录用户，需要 docker 权限（一般 root）
-#   SSH_KEY       SSH 私钥全文（含 BEGIN/END 行）
-#   SSH_PORT      可选，默认 22
-#   COS_SECRET_ID 腾讯云子账号 SecretId（最小权限，见 README 说明）
-#   COS_SECRET_KEY 对应 SecretKey
-#   COS_BUCKET    形如 khavit-1250000000（必须带 APPID 后缀）
-#   COS_REGION    ap-guangzhou
-#   COS_ENDPOINT  可选，服务器同地域内网：cos-internal.ap-guangzhou.myqcloud.com
-#                 留空则用公网 cos.<region>.myqcloud.com
+#   SSH_HOST       服务器地址（IP 或域名）
+#   SSH_USER       登录用户（需 docker 权限）
+#   SSH_KEY        SSH 私钥全文（含 BEGIN/END 行）
+#   SSH_PORT       可选，默认 22
+#   TCR_USERNAME   腾讯云个人版镜像仓库用户名（= 账号 APPID，125 开头）
+#   TCR_PASSWORD   个人版仓库密码（控制台「容器镜像服务 → 个人版」里设置）
 #   Variable: VITE_MAIL_HOST  登录页展示的邮件主机名，如 mail.kamisato.top
 
 on:
@@ -32,9 +33,11 @@ concurrency:
 
 env:
   STALWART_TAG: v1
-  COS_PREFIX: khavit/images
   APP_DIR: /opt/khavit
   SITE_INDEX_DIR: /opt/1panel/www/sites/khavit.kamisato.top/index
+  # 腾讯云「容器镜像服务 - 个人版」，免费；命名空间在控制台创建后改这里
+  TCR_REGISTRY: ccr.ccs.tencentyun.com
+  TCR_NAMESPACE: khavit
 
 jobs:
   # ---------------------------------------------------------------- 1. 构建
@@ -74,75 +77,29 @@ jobs:
           path: frontend/dist
           retention-days: 3
 
-  # ------------------------------------------------------- 2. 镜像中转 COS
+  # ------------------------------------------------- 2. 镜像推送到腾讯云仓库
   publish-image:
-    name: 2/3 镜像上传 COS
+    name: 2/3 推送镜像
     needs: build
     runs-on: ubuntu-latest
     outputs:
-      object_key: ${{ steps.meta.outputs.object_key }}
-      digest: ${{ steps.meta.outputs.digest }}
+      image_id: ${{ steps.push.outputs.image_id }}
     steps:
-      - name: 拉取镜像并计算对象名
-        id: meta
+      - name: 拉取并推送
+        id: push
+        env:
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         run: |
           set -euo pipefail
           docker pull "stalwartlabs/stalwart:${STALWART_TAG}"
-          digest=$(docker image inspect --format '{{index .RepoDigests 0}}' \
-            "stalwartlabs/stalwart:${STALWART_TAG}" | sed 's/.*@sha256://')
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
-          # 对象名带 digest 前 12 位：镜像不变时服务器侧可直接跳过下载
-          echo "object_key=${COS_PREFIX}/stalwart-${STALWART_TAG}-${digest:0:12}.tar.gz" >> "$GITHUB_OUTPUT"
-
-      - name: 安装 coscli
-        run: |
-          set -euo pipefail
-          curl -fsSL https://github.com/tencentyun/coscli/releases/download/v1.0.9/coscli-v1.0.9-linux-amd64 \
-            -o /usr/local/bin/coscli
-          chmod 755 /usr/local/bin/coscli
-          coscli --version
-
-      - name: 写 coscli 配置（Runner 走公网域名）
-        env:
-          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
-          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
-          COS_BUCKET: ${{ secrets.COS_BUCKET }}
-          COS_REGION: ${{ secrets.COS_REGION }}
-        run: |
-          set -euo pipefail
-          cat > "$HOME/.cos.yaml" <<'YAML'
-          cos:
-            base:
-              secretid: __SECRET_ID__
-              secretkey: __SECRET_KEY__
-              protocol: https
-            buckets:
-              - name: __BUCKET__
-                alias: deploy
-                region: __REGION__
-                endpoint: cos.__REGION__.myqcloud.com
-                ofs: false
-          YAML
-          sed -i \
-            -e "s|__SECRET_ID__|${COS_SECRET_ID}|" \
-            -e "s|__SECRET_KEY__|${COS_SECRET_KEY}|" \
-            -e "s|__BUCKET__|${COS_BUCKET}|" \
-            -e "s|__REGION__|${COS_REGION}|g" \
-            "$HOME/.cos.yaml"
-          chmod 600 "$HOME/.cos.yaml"
-
-      - name: 压缩并上传（同名对象已存在则跳过）
-        run: |
-          set -euo pipefail
-          key="${{ steps.meta.outputs.object_key }}"
-          if coscli ls "cos://deploy/${COS_PREFIX}/" 2>/dev/null | grep -Fq "$(basename "$key")"; then
-            echo "COS 上已有 $(basename "$key")，跳过上传"
-            exit 0
-          fi
-          docker save "stalwartlabs/stalwart:${STALWART_TAG}" | gzip -6 > /tmp/image.tar.gz
-          ls -lh /tmp/image.tar.gz
-          coscli cp /tmp/image.tar.gz "cos://deploy/${key}"
-          coscli ls "cos://deploy/${key}"
+          remote_ref="${TCR_REGISTRY}/${TCR_NAMESPACE}/stalwart:${STALWART_TAG}"
+          docker tag "stalwartlabs/stalwart:${STALWART_TAG}" "$remote_ref"
+          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
+          # 镜像没变时 push 是幂等的：layer 已存在，不会重复上传
+          docker push "$remote_ref"
+          # image ID（config digest）与所在 registry 无关，服务器用它判断要不要重新 pull
+          echo "image_id=$(docker image inspect --format '{{.Id}}' "$remote_ref")" >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------ 3. 部署
   deploy:
@@ -164,29 +121,27 @@ jobs:
           tar -czf .deploy/dist.tar.gz -C frontend dist
           ls -lh .deploy/dist.tar.gz
 
-      - name: 上传产物与 compose 文件
+      - name: 上传产物、compose 与部署脚本
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: '.deploy/dist.tar.gz,docker-compose.yml,docker-compose.server.yml'
+          source: '.deploy/dist.tar.gz,docker-compose.yml,docker-compose.server.yml,deploy/scripts/remote-deploy.sh'
           target: /tmp/khavit-upload
           rm: true
           overwrite: true
           timeout: 180s
 
-      - name: 远端拉镜像并发布
+      - name: 执行远端部署脚本
         uses: appleboy/ssh-action@v1.2.0
         env:
-          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
-          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
-          COS_BUCKET: ${{ secrets.COS_BUCKET }}
-          COS_REGION: ${{ secrets.COS_REGION }}
-          COS_ENDPOINT: ${{ secrets.COS_ENDPOINT }}
-          IMAGE_KEY: ${{ needs.publish-image.outputs.object_key }}
-          IMAGE_DIGEST: ${{ needs.publish-image.outputs.digest }}
+          TCR_REGISTRY: ${{ env.TCR_REGISTRY }}
+          TCR_NAMESPACE: ${{ env.TCR_NAMESPACE }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+          IMAGE_ID: ${{ needs.publish-image.outputs.image_id }}
           IMAGE_TAG: ${{ env.STALWART_TAG }}
           APP_DIR: ${{ env.APP_DIR }}
           SITE_INDEX_DIR: ${{ env.SITE_INDEX_DIR }}
@@ -195,97 +150,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          envs: COS_SECRET_ID,COS_SECRET_KEY,COS_BUCKET,COS_REGION,COS_ENDPOINT,IMAGE_KEY,IMAGE_DIGEST,IMAGE_TAG,APP_DIR,SITE_INDEX_DIR
+          envs: TCR_REGISTRY,TCR_NAMESPACE,TCR_USERNAME,TCR_PASSWORD,IMAGE_ID,IMAGE_TAG,APP_DIR,SITE_INDEX_DIR
           script_stop: true
           command_timeout: 30m
+          # 只发一行命令：真实逻辑在服务器磁盘上的 remote-deploy.sh 里执行。
+          # tr -d '\r' 是保险：万一脚本被 Windows 行尾污染，先清一遍再跑。
           script: |
-            set -euo pipefail
-
-            # --- 1) coscli：首次自动安装（走腾讯云国内 CDN，约 10MB） ---
-            if ! command -v coscli >/dev/null 2>&1; then
-              echo "安装 coscli"
-              curl -fsSL https://cosbrowser.cloud.tencent.com/software/coscli/coscli-linux-amd64 \
-                -o /usr/local/bin/coscli
-              chmod 755 /usr/local/bin/coscli
-            fi
-
-            # --- 2) coscli 配置：同地域机器填内网 endpoint ---
-            # 注意：这里不能用 heredoc。drone-ssh 把脚本传到远端时会剥掉每行的行首缩进，
-            # heredoc 正文里的 YAML 缩进会一起丢掉，coscli 会报
-            # "mapping values are not allowed in this context"。
-            # 所以用 printf 逐行拼，缩进写在字符串字面量里，不受传输层影响。
-            ENDPOINT="${COS_ENDPOINT:-cos.${COS_REGION}.myqcloud.com}"
-            printf '%s\n' \
-              'cos:' \
-              '  base:' \
-              "    secretid: ${COS_SECRET_ID}" \
-              "    secretkey: ${COS_SECRET_KEY}" \
-              '    protocol: https' \
-              '  buckets:' \
-              "    - name: ${COS_BUCKET}" \
-              '      alias: deploy' \
-              "      region: ${COS_REGION}" \
-              "      endpoint: ${ENDPOINT}" \
-              '      ofs: false' \
-              > "$HOME/.cos.yaml"
-            chmod 600 "$HOME/.cos.yaml"
-            echo "COS endpoint = ${ENDPOINT}"
-            # 结构自检：第 2 行必须是两格缩进的 base，缩进若再被剥掉立刻报出来
-            if ! sed -n '2p' "$HOME/.cos.yaml" | grep -q '^  base:'; then
-              echo "cos.yaml 缩进异常，内容疑似被传输层破坏：" >&2
-              sed 's/secretid:.*/secretid: <隐去>/; s/secretkey:.*/secretkey: <隐去>/' "$HOME/.cos.yaml" >&2
-              exit 1
-            fi
-
-            # --- 3) 镜像：digest 未变且本地已存在则跳过下载 ---
-            mkdir -p "$APP_DIR"
-            if [ -f "$APP_DIR/.image-digest" ] \
-               && [ "$(cat "$APP_DIR/.image-digest")" = "$IMAGE_DIGEST" ] \
-               && docker image inspect "stalwartlabs/stalwart:${IMAGE_TAG}" >/dev/null 2>&1; then
-              echo "镜像未变化（${IMAGE_DIGEST:0:12}），跳过下载"
-            else
-              echo "从 COS 下载镜像：${IMAGE_KEY}"
-              rm -f /tmp/stalwart-image.tar.gz
-              coscli cp "cos://deploy/${IMAGE_KEY}" /tmp/stalwart-image.tar.gz
-              gunzip -c /tmp/stalwart-image.tar.gz | docker load
-              rm -f /tmp/stalwart-image.tar.gz
-              printf '%s' "$IMAGE_DIGEST" > "$APP_DIR/.image-digest"
-            fi
-
-            # --- 4) compose：文件随仓库发布，.env 由服务器手工维护 ---
-            cp /tmp/khavit-upload/docker-compose.yml "$APP_DIR/docker-compose.yml"
-            cp /tmp/khavit-upload/docker-compose.server.yml "$APP_DIR/docker-compose.server.yml"
-            if [ ! -f "$APP_DIR/.env" ]; then
-              echo "缺少 $APP_DIR/.env，请先在服务器上创建并填好 MAIL_HOST / MAIL_DOMAIN / ADMIN_MAIL" >&2
-              exit 1
-            fi
-            cd "$APP_DIR"
-            docker compose -f docker-compose.yml -f docker-compose.server.yml up -d
-
-            # --- 5) 后端健康检查 ---
-            for i in $(seq 1 30); do
-              if curl -fsSk --max-time 3 https://127.0.0.1:8443/healthz/live >/dev/null 2>&1; then
-                echo "后端健康检查通过"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "后端健康检查超时" >&2
-                docker compose -f docker-compose.yml -f docker-compose.server.yml logs --tail=50 stalwart >&2
-                exit 1
-              fi
-              sleep 2
-            done
-
-            # --- 6) 前端：解包到临时目录后原子替换，保留上一版用于回滚 ---
-            rm -rf /tmp/khavit-upload/out
-            mkdir -p /tmp/khavit-upload/out
-            tar -xzf /tmp/khavit-upload/.deploy/dist.tar.gz -C /tmp/khavit-upload/out
-            mkdir -p "$SITE_INDEX_DIR"
-            if [ -d "$SITE_INDEX_DIR/dist" ]; then
-              rm -rf "$SITE_INDEX_DIR/dist.prev"
-              mv "$SITE_INDEX_DIR/dist" "$SITE_INDEX_DIR/dist.prev"
-            fi
-            mv /tmp/khavit-upload/out/dist "$SITE_INDEX_DIR/dist"
-            chmod -R a+rX "$SITE_INDEX_DIR/dist"
-            rm -rf /tmp/khavit-upload
-            echo "前端已发布到 $SITE_INDEX_DIR/dist （回滚目录 dist.prev）"
+            tr -d '\r' < /tmp/khavit-upload/deploy/scripts/remote-deploy.sh > /tmp/khavit-remote-deploy.sh
+            bash /tmp/khavit-remote-deploy.sh
