@@ -1,22 +1,22 @@
 name: deploy
 
-# 构建 → 镜像推送到腾讯云容器镜像服务（个人版）→ 服务器拉取并部署
+# 只做两件事：构建前端 → 把 dist 发到服务器并重启后端
 #
-# 镜像走 registry 而不是 COS tar 包：registry 按 layer 去重，镜像不变时 push/pull 几乎零流量；
-# 服务器（腾讯云 CVM）与个人版仓库同账号时走内网拉取，免公网流量费。
+# 为什么工作流里不搬镜像：
+#   Runner 在海外、服务器在国内，跨境搬 490MB 镜像既慢又容易超时；
+#   而腾讯云 CVM 预置了内网 Docker Hub 镜像源（mirror.ccs.tencentyun.com），
+#   服务器自己 docker pull 走内网、免公网流量。所以镜像交给服务器拉，
+#   工作流只负责构建前端 + 同步 compose + 触发部署。
 #
-# 远端执行方式：所有部署逻辑在 deploy/scripts/remote-deploy.sh 里，
-# scp 上传后 ssh-action 只发一行命令执行。
-# （不要把长脚本内联在 script 里：drone-ssh 传输时会破坏内容——
-#   heredoc 缩进被剥掉、长脚本静默截断，都实测踩过。）
+# 远端执行方式：逻辑全在 deploy/scripts/remote-deploy.sh，scp 上传后 ssh 只发一行命令。
+# （不要把长脚本内联在 ssh-action 的 script 里：drone-ssh 传输时会破坏内容，
+#   heredoc 缩进被剥、长脚本静默截断，都实测踩过。）
 #
-# 需要的仓库 Secret / Variable（Settings → Secrets and variables → Actions）：
-#   SSH_HOST       服务器地址（IP 或域名）
-#   SSH_USER       登录用户（需 docker 权限）
-#   SSH_KEY        SSH 私钥全文（含 BEGIN/END 行）
-#   SSH_PORT       可选，默认 22
-#   TCR_USERNAME   腾讯云个人版镜像仓库用户名（= 账号 APPID，125 开头）
-#   TCR_PASSWORD   个人版仓库密码（控制台「容器镜像服务 → 个人版」里设置）
+# 需要的仓库 Secret / Variable：
+#   SSH_HOST   服务器地址
+#   SSH_USER   登录用户（需 docker 权限）
+#   SSH_KEY    SSH 私钥全文（含 BEGIN/END 行）
+#   SSH_PORT   可选，默认 22
 #   Variable: VITE_MAIL_HOST  登录页展示的邮件主机名，如 mail.kamisato.top
 
 on:
@@ -35,14 +35,11 @@ env:
   STALWART_TAG: v1
   APP_DIR: /opt/khavit
   SITE_INDEX_DIR: /opt/1panel/www/sites/khavit.kamisato.top/index
-  # 腾讯云「容器镜像服务 - 个人版」，免费；命名空间在控制台创建后改这里
-  TCR_REGISTRY: ccr.ccs.tencentyun.com
-  TCR_NAMESPACE: khavit
 
 jobs:
   # ---------------------------------------------------------------- 1. 构建
   build:
-    name: 1/3 构建前端
+    name: 1/2 构建前端
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -77,61 +74,10 @@ jobs:
           path: frontend/dist
           retention-days: 3
 
-  # ------------------------------------------------- 2. 镜像推送到腾讯云仓库
-  publish-image:
-    name: 2/3 推送镜像
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    outputs:
-      image_id: ${{ steps.push.outputs.image_id }}
-    steps:
-      - name: 拉取并推送
-        id: push
-        env:
-          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-        run: |
-          set -euo pipefail
-          docker pull "stalwartlabs/stalwart:${STALWART_TAG}"
-          remote_ref="${TCR_REGISTRY}/${TCR_NAMESPACE}/stalwart:${STALWART_TAG}"
-          docker tag "stalwartlabs/stalwart:${STALWART_TAG}" "$remote_ref"
-          # image ID（config digest）与所在 registry 无关，服务器用它判断要不要重新 pull
-          image_id=$(docker image inspect --format '{{.Id}}' "$remote_ref")
-          echo "image_id=${image_id}" >> "$GITHUB_OUTPUT"
-
-          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
-
-          # 远端已是同一镜像就跳过推送：
-          # 海外 Runner 推广州的 TCR 很慢，日常部署（镜像没变）不应该走跨境大传输。
-          # 首次播种建议从国内机器（家里/服务器）手动 docker push 一次。
-          remote_config=$(docker manifest inspect "$remote_ref" 2>/dev/null | jq -r '.config.digest // empty' || true)
-          if [ "$remote_config" = "$image_id" ]; then
-            echo "远端镜像未变化（${image_id}），跳过推送"
-            exit 0
-          fi
-
-          # 真要推时（上游镜像更新了）：分次重试，已推完的 layer 会自动跳过（断点续传）
-          ok=0
-          for i in 1 2 3 4 5; do
-            echo "推送尝试 $i/5"
-            if timeout 20m docker push "$remote_ref"; then
-              ok=1
-              break
-            fi
-            echo "推送中断，10 秒后重试（已完成的层不会重传）"
-            sleep 10
-          done
-          if [ "$ok" -ne 1 ]; then
-            echo "镜像推送失败。可以在国内机器上手动播种：" >&2
-            echo "  docker tag stalwartlabs/stalwart:${STALWART_TAG} ${remote_ref} && docker push ${remote_ref}" >&2
-            exit 1
-          fi
-
-  # ------------------------------------------------------------ 3. 部署
+  # ------------------------------------------------------------ 2. 部署
   deploy:
-    name: 3/3 部署到服务器
-    needs: [build, publish-image]
+    name: 2/2 部署到服务器
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -164,12 +110,7 @@ jobs:
       - name: 执行远端部署脚本
         uses: appleboy/ssh-action@v1.2.0
         env:
-          TCR_REGISTRY: ${{ env.TCR_REGISTRY }}
-          TCR_NAMESPACE: ${{ env.TCR_NAMESPACE }}
-          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-          IMAGE_ID: ${{ needs.publish-image.outputs.image_id }}
-          IMAGE_TAG: ${{ env.STALWART_TAG }}
+          STALWART_TAG: ${{ env.STALWART_TAG }}
           APP_DIR: ${{ env.APP_DIR }}
           SITE_INDEX_DIR: ${{ env.SITE_INDEX_DIR }}
         with:
@@ -177,10 +118,10 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          envs: TCR_REGISTRY,TCR_NAMESPACE,TCR_USERNAME,TCR_PASSWORD,IMAGE_ID,IMAGE_TAG,APP_DIR,SITE_INDEX_DIR
+          envs: STALWART_TAG,APP_DIR,SITE_INDEX_DIR
           script_stop: true
-          command_timeout: 30m
-          # 只发一行命令：真实逻辑在服务器磁盘上的 remote-deploy.sh 里执行。
+          command_timeout: 20m
+          # 只发两行命令：真实逻辑在服务器磁盘上的 remote-deploy.sh 里执行。
           # tr -d '\r' 是保险：万一脚本被 Windows 行尾污染，先清一遍再跑。
           script: |
             tr -d '\r' < /tmp/khavit-upload/deploy/scripts/remote-deploy.sh > /tmp/khavit-remote-deploy.sh
