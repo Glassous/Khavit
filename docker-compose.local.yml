@@ -1,0 +1,21 @@
+# 本地实测/开发用覆盖层（不要用于生产）
+# 用法：docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+# 作用：把端口挪到高位避免与本机已占用端口冲突，数据目录隔离到 data-local/
+name: postal-local
+
+services:
+  stalwart:
+    ports: !override
+      - "8025:25"
+      - "8465:465"
+      - "8587:587"
+      - "8993:993"
+      - "8995:995"
+      - "14190:4190"
+      - "8443:443"
+      - "18080:8080"
+    volumes:
+      - ./data-local/etc:/etc/stalwart
+      - ./data-local/lib:/var/lib/stalwart
+    environment:
+      STALWART_HEALTHCHECK_URL: https://127.0.0.1:443/healthz/live

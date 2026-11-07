@@ -1,0 +1,264 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------
+   设计令牌：浅色为基，深色为反相（不是简单反色，阴影改亮边）
+   --------------------------------------------------------------- */
+@theme {
+  --font-sans: 'PingFang SC', 'Noto Sans SC', 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', Georgia, serif;
+
+  --color-canvas: #f7f8fa;
+  --color-canvas-deep: #eef1f6;
+  --color-surface: #ffffff;
+  --color-surface-2: #f2f4f8;
+  --color-surface-3: #e8ecf3;
+  --color-line: #e3e7ee;
+  --color-line-strong: #cfd6e2;
+
+  --color-ink: #0f1520;
+  --color-ink-2: #5a6474;
+  --color-ink-3: #8a93a3;
+  --color-ink-4: #b3bac6;
+
+  --color-brand: #2f5bea;
+  --color-brand-strong: #1e40af;
+  --color-brand-soft: #6d8bff;
+  --color-brand-ghost: #eaf0ff;
+
+  --color-teal: #12876f;
+  --color-amber: #b4690e;
+  --color-danger: #c8392b;
+  --color-gold: #e8a33d;
+
+  --radius-card: 14px;
+  --radius-panel: 18px;
+
+  --shadow-soft: 0 1px 2px rgb(15 21 32 / 0.04), 0 8px 24px -12px rgb(15 21 32 / 0.12);
+  --shadow-pop: 0 12px 48px -16px rgb(15 21 32 / 0.24), 0 2px 6px rgb(15 21 32 / 0.06);
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 深色令牌：只覆盖变量，工具类自动跟随 */
+.dark {
+  --color-canvas: #0e1116;
+  --color-canvas-deep: #0a0d11;
+  --color-surface: #151a22;
+  --color-surface-2: #1b222c;
+  --color-surface-3: #232c38;
+  --color-line: #262e3a;
+  --color-line-strong: #35404f;
+
+  --color-ink: #f2f4f8;
+  --color-ink-2: #a7b0bd;
+  --color-ink-3: #737e8d;
+  --color-ink-4: #566170;
+
+  --color-brand: #6d8bff;
+  --color-brand-strong: #93a8ff;
+  --color-brand-soft: #2f5bea;
+  --color-brand-ghost: #1a2340;
+
+  --shadow-soft: 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -20px rgb(0 0 0 / 0.8);
+  --shadow-pop: 0 24px 64px -24px rgb(0 0 0 / 0.9), 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-variant-numeric: tabular-nums;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand) 22%, transparent);
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-4);
+  }
+}
+
+@layer components {
+  /* 克制的玻璃质感：只在顶栏、抽屉、浮层使用 */
+  .glass {
+    background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  }
+
+  .hairline {
+    border: 1px solid var(--color-line);
+  }
+
+  .brand-gradient {
+    background-image:
+      radial-gradient(1200px 600px at 12% -10%, #2f5bea 0%, transparent 55%),
+      radial-gradient(900px 600px at 88% 8%, #12876f 0%, transparent 50%),
+      linear-gradient(160deg, #101a3a 0%, #0b1220 60%, #0a1017 100%);
+  }
+
+  .grid-noise {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(circle at 30% 20%, #000 20%, transparent 75%);
+  }
+
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* 未读左侧强调条 */
+  .unread-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--color-brand);
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out-soft);
+  }
+
+  .unread-bar.is-unread::before {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-rise {
+    animation: rise 220ms var(--ease-out-soft) both;
+  }
+
+  .animate-fade {
+    animation: fade 180ms var(--ease-out-soft) both;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 240ms var(--ease-out-soft) both;
+  }
+
+  .animate-pop {
+    animation: pop 180ms var(--ease-out-soft) both;
+  }
+
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-surface-2) 0%,
+      var(--color-surface-3) 40%,
+      var(--color-surface-2) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

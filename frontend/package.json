@@ -1,0 +1,35 @@
+{
+  "name": "postal-webmail",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "自建邮局的自研前端：Webmail + 账号管理，直连 Stalwart JMAP",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "build:fast": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "dompurify": "^3.2.4",
+    "lucide-vue-next": "^0.469.0",
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.6",
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.0.0",
+    "tailwindcss": "^4.0.6",
+    "typescript": "~5.7.3",
+    "vite": "^5.4.14",
+    "vitest": "^2.1.9",
+    "vue-tsc": "^2.2.0"
+  }
+}

@@ -1,0 +1,34 @@
+# 运行数据（邮件、账号、证书）绝不入库
+data/
+data-local/
+
+# 环境变量与凭据
+.env
+.env.local
+.env.*.local
+
+# 前端
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/releases/
+*.tsbuildinfo
+
+# 探针
+tools/jmap-probe/node_modules/
+
+# 备份与日志
+backups/
+*.log
+*.tmp
+*.lock
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# 生成的契约文档片段
+docs/.jmap-raw/

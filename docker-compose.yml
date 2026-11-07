@@ -1,0 +1,73 @@
+# 自建邮局 —— 后端仅一个 Stalwart 容器
+# 前端 Vue SPA 不进容器，由宿主机 Nginx 托管静态文件并反代 /jmap
+name: postal
+
+services:
+  stalwart:
+    image: stalwartlabs/stalwart:${STALWART_TAG:-v1}
+    container_name: stalwart
+    hostname: ${MAIL_HOST:-mail.example.com}
+    init: true
+    restart: unless-stopped
+    # Stalwart 默认监听 443，这里只发布到回环地址，公网 443 由 Nginx 持有
+    # 邮件协议端口必须直连公网，无法经 Nginx 代理
+    ports:
+      - "25:25"                 # SMTP MTA（服务器间投递）
+      - "465:465"               # SMTPS / Submission
+      - "587:587"               # Submission (STARTTLS)
+      - "993:993"               # IMAPS
+      - "995:995"               # POP3S
+      - "4190:4190"             # ManageSieve
+      - "127.0.0.1:443:443"     # HTTPS / JMAP，仅供本机 Nginx 反代
+      - "127.0.0.1:8080:8080"   # setup 向导与 recovery 模式，禁止暴露公网
+    volumes:
+      - ./data/etc:/etc/stalwart              # config.json，丢失会回到 setup 向导
+      - ./data/lib:/var/lib/stalwart          # RocksDB：邮件/账号/索引
+      - ./data/certs:/opt/certs:ro            # 可选：共享的 TLS 证书目录
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      # 容器健康检查地址。若将来移除 8080，此处必须先改，否则容器被判 unhealthy
+      STALWART_HEALTHCHECK_URL: https://127.0.0.1:443/healthz/live
+      # 预设管理员口令（形如 admin:<password>），仅首次 setup 时使用，完成后务必删除
+      STALWART_RECOVERY_ADMIN: ${STALWART_RECOVERY_ADMIN:-}
+    # 2G 服务器硬约束：限制容器内存，禁止借用 swap 造成系统级 OOM
+    mem_limit: ${STALWART_MEM_LIMIT:-1g}
+    memswap_limit: ${STALWART_MEM_LIMIT:-1g}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # 可选：把内嵌 RocksDB 换成 PostgreSQL
+  # 仅当需要集群/多节点时才启用（官方明确：组集群必须一开始就用共享存储）
+  # 单机个人使用请保持关闭，2G 内存下多一个 PG 实例约多占 150-250MB 常驻
+  #
+  # 启用步骤：
+  #   1. docker compose --profile postgres up -d postgres
+  #   2. 在 Stalwart 向导/管理后台把 Data store 改为 PostgreSQL
+  #      host=postgres port=5432 database=stalwart user=stalwart
+  #   3. 集群模式还需额外准备 Redis（Cache & Temporary Data）
+  # ---------------------------------------------------------------------------
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: stalwart-pg
+  #   restart: unless-stopped
+  #   profiles: ["postgres"]
+  #   environment:
+  #     POSTGRES_DB: stalwart
+  #     POSTGRES_USER: stalwart
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+  #   volumes:
+  #     - ./data/pg:/var/lib/postgresql/data
+  #   mem_limit: ${POSTGRES_MEM_LIMIT:-256m}
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
