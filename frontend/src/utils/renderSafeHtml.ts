@@ -143,13 +143,13 @@ export function buildIframeDoc(bodyHtml: string, dark: boolean): string {
   const link = dark ? '#93a8ff' : '#2f5bea'
   const quoteBorder = dark ? '#35404f' : '#e3e7ee'
 
-  return `<!doctype html><html><head><meta charset="utf-8">
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <base target="_blank">
 <style>
   html,body{margin:0;padding:0;background:${bg};color:${fg};}
-  body{font-family:"PingFang SC","Noto Sans SC","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.72;
-       padding:4px 2px 12px;word-break:break-word;overflow-wrap:anywhere;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC","Noto Sans SC","Segoe UI",system-ui,sans-serif;
+       font-size:14px;line-height:1.72;padding:4px 2px 12px;word-break:break-word;overflow-wrap:anywhere;}
   a{color:${link};text-decoration:none;} a:hover{text-decoration:underline;}
   img{max-width:100%;height:auto;}
   table{max-width:100%;border-collapse:collapse;}

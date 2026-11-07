@@ -73,6 +73,23 @@ make frontend-deploy   # 构建 + 原子软链发布 + reload nginx
 | `make frontend-deploy` | 构建并发布前端 |
 | `make certs` | 证书续期后重载 Nginx 与后端 |
 
+## 本地开发：内置模拟数据
+
+前端带了一套演示数据，`make frontend-dev` 打开后**不连后端**也能完整走一遍界面：
+
+- 任意邮箱 + 任意密码即可登录（登录页会显示「本地演示模式」提示）
+- 收件箱 13 封中文邮件（含 HTML 正文、附件、星标、已读/未读）、搜索、写信发送、管理后台的域名与账号都是真的可操作
+- 改动写进浏览器 localStorage（`postal.mock.state.v1`），刷新不丢；控制台执行 `__resetMockData()` 恢复初始数据
+- 要连真实后端：在 `frontend/.env.local` 里加 `VITE_USE_MOCK=false`，请求会回到 Vite 的 `/jmap` 代理
+
+模拟层只在 `import.meta.env.DEV` 下用 `await import()` 加载，生产构建时整块被剔除，
+`dist/` 里不含任何演示数据：
+
+```bash
+make frontend-build
+grep -r "本地演示账号" frontend/dist || echo "干净：产物里没有模拟数据"
+```
+
 ## 目录
 
 ```

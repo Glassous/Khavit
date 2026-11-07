@@ -145,6 +145,42 @@ sudo systemctl reload nginx
 
 前端与后端完全解耦：只改 UI 可以独立发版、独立回滚，不需要重启容器。
 
+### 5.1 路由模式与「刷新 404」
+
+前端是单页应用，路由有两种模式，由 `frontend/.env.example` 里的 `VITE_ROUTER_MODE` 控制：
+
+| 模式 | 地址形态 | 服务端要求 |
+| --- | --- | --- |
+| `hash`（默认） | `https://mail.example.com/#/mail/inbox` | 无。路径全在 `#` 后，服务端只会看到 `/` |
+| `history` | `https://mail.example.com/mail/inbox` | 必须把未命中的路径回退到 `index.html` |
+
+**症状**：用 `history` 模式但服务端没配回退时，点站内链接一切正常（前端路由不请求服务端），
+一刷新 `/mail/inbox` 就 404 —— 因为 Nginx 按真实文件路径找不到 `mail/inbox`。
+
+**处理**（任选其一）：
+
+1. 保持默认 `hash`：什么都不用做，任何静态托管都不会 404（1Panel 静态站点、对象存储同理）。
+2. 想用干净 URL，就在生成站点配置里加回退，再把构建变量设成 `VITE_ROUTER_MODE=history`：
+
+```nginx
+# 1Panel：网站 → 配置文件 / 伪静态 里补一段
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+```nginx
+# 静态资源长缓存，index.html 不缓存，避免发版后拿到旧壳
+location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; }
+location / { try_files $uri $uri/ /index.html; add_header Cache-Control "no-cache"; }
+```
+
+完整示例见 `deploy/nginx/mail.example.com.conf`。改完执行 `nginx -t && nginx -s reload`
+（1Panel 里是「保存并重载」）。
+
+> 从 `history` 切回 `hash` 时，旧书签 `/mail/inbox` 会被前端自动改写成 `/#/mail/inbox`，
+> 不需要重新收藏。
+
 ## 6. 备份与恢复
 
 RocksDB 是单进程独占，**必须冷备**：

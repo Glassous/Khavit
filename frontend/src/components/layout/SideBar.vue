@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '../../stores/auth'
 import { useMailStore } from '../../stores/mail'
 import { useComposerStore } from '../../stores/composer'
+import { mailboxLabel, roleOrder } from '../../utils/i18n'
 import type { Mailbox } from '../../jmap/types'
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false })
@@ -26,8 +27,6 @@ const mail = useMailStore()
 const composer = useComposerStore()
 const router = useRouter()
 const route = useRoute()
-
-const ROLE_ORDER = ['inbox', 'drafts', 'sent', 'junk', 'trash', 'archive']
 
 const roleIcons: Record<string, unknown> = {
   inbox: Inbox,
@@ -41,12 +40,10 @@ const roleIcons: Record<string, unknown> = {
 const boxes = computed(() => {
   const list = [...auth.mailboxes]
   return list.sort((a, b) => {
-    const ai = ROLE_ORDER.indexOf(a.role ?? '')
-    const bi = ROLE_ORDER.indexOf(b.role ?? '')
-    if (ai !== -1 && bi !== -1) return ai - bi
-    if (ai !== -1) return -1
-    if (bi !== -1) return 1
-    return a.name.localeCompare(b.name, 'zh-CN')
+    const diff = roleOrder(a.role) - roleOrder(b.role)
+    if (diff !== 0) return diff
+    // 中文界面下按中文排序规则比较文件夹名
+    return mailboxLabel(a).localeCompare(mailboxLabel(b), 'zh-CN')
   })
 })
 
@@ -126,7 +123,7 @@ async function go(path: string): Promise<void> {
           class="h-4 w-4 shrink-0"
           :class="isActive(box) ? 'text-brand' : 'text-ink-3 group-hover:text-ink-2'"
         />
-        <span class="flex-1 truncate">{{ box.name }}</span>
+        <span class="flex-1 truncate" :title="mailboxLabel(box)">{{ mailboxLabel(box) }}</span>
         <span
           v-if="box.unreadEmails > 0"
           class="rounded-full px-1.5 py-[1px] text-[11px] font-semibold leading-4"

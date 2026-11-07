@@ -1,4 +1,5 @@
 import { CORE, STALWART, jmap } from './client'
+import { fieldLabel, translateFailure } from '../utils/i18n'
 import type { AccountRecord, DomainRecord, Id } from './types'
 
 const USING = [CORE, STALWART]
@@ -9,13 +10,17 @@ export async function listDomains(): Promise<DomainRecord[]> {
 }
 
 export async function createDomain(name: string): Promise<Id> {
-  const res = await jmap.callOne<{ created?: Record<string, { id: Id }>; notCreated?: Record<string, unknown> }>(
-    'x:Domain/set',
-    { create: { domain: { name } } },
-    USING,
-  )
+  const res = await jmap.callOne<{
+    created?: Record<string, { id: Id }>
+    notCreated?: Record<string, { type: string; description?: string; properties?: string[] }>
+  }>('x:Domain/set', { create: { domain: { name } } }, USING)
   const created = res.created?.domain
-  if (!created) throw new Error(`创建域名失败：${JSON.stringify(res.notCreated)}`)
+  if (!created) {
+    const failure = res.notCreated?.domain
+    const fields = (failure?.properties ?? []).map((item) => fieldLabel(item)).join('、')
+    const reason = translateFailure(failure?.type, failure?.description)
+    throw new Error(fields ? `创建域名失败：${fields}${reason}` : `创建域名失败：${reason}`)
+  }
   return created.id
 }
 
@@ -70,9 +75,10 @@ export async function createAccount(input: CreateAccountInput): Promise<Id> {
   const created = res.created?.account
   if (!created) {
     const failure = res.notCreated?.account
-    const detail = failure?.description ?? '未知原因'
-    const field = failure?.properties?.join('、')
-    throw new Error(field ? `${field}：${detail}` : detail)
+    const fields = (failure?.properties ?? []).map((item) => fieldLabel(item)).join('、')
+    // 服务端描述是英文（如 "password too weak"），一律换成中文提示
+    const reason = translateFailure(failure?.type, failure?.description)
+    throw new Error(fields ? `${fields}：${reason}` : reason)
   }
   return created.id
 }

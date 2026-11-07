@@ -5,6 +5,7 @@ import { useMailStore } from '../../stores/mail'
 import { useAuthStore } from '../../stores/auth'
 import { useToast } from '../../composables/useToast'
 import { useConfirm } from '../../composables/useConfirm'
+import { formatNumber, mailboxLabel } from '../../utils/i18n'
 import MailListItem from './MailListItem.vue'
 import AppSkeleton from '../ui/AppSkeleton.vue'
 import AppEmpty from '../ui/AppEmpty.vue'
@@ -27,7 +28,7 @@ const filters = [
 
 const title = computed(() => {
   if (mail.activeSearch) return `搜索「${mail.activeSearch}」`
-  return mail.currentMailbox?.name ?? '收件箱'
+  return mailboxLabel(mail.currentMailbox)
 })
 
 const checkedAll = computed(
@@ -104,7 +105,7 @@ async function bulkDelete(): Promise<void> {
         @change="toggleAll"
       />
       <h2 class="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">{{ title }}</h2>
-      <span class="shrink-0 text-[11.5px] tabular-nums text-ink-3">{{ mail.total }} 封</span>
+      <span class="shrink-0 text-[11.5px] tabular-nums text-ink-3">{{ formatNumber(mail.total) }} 封</span>
       <button
         type="button"
         class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
@@ -209,7 +210,7 @@ async function bulkDelete(): Promise<void> {
           v-else-if="!mail.hasMore && mail.emails.length > 8"
           class="py-4 text-center text-[11.5px] text-ink-4"
         >
-          已经到底了 · 共 {{ mail.total }} 封
+          已经到底了 · 共 {{ formatNumber(mail.total) }} 封
         </div>
       </template>
     </div>

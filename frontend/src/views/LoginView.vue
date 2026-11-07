@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, KeyRound, Mail, ShieldCheck, Server } from 'lucide-vue-next'
+import { ArrowRight, FlaskConical, KeyRound, Mail, ShieldCheck, Server } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 import AppButton from '../components/ui/AppButton.vue'
 import AppInput from '../components/ui/AppInput.vue'
@@ -14,6 +14,8 @@ const mail = ref('')
 const password = ref('')
 const submitted = ref(false)
 const localError = ref('')
+/** 本地演示提示；生产构建里 DEV 为 false，动态 import 会被整段移除 */
+const mockHint = ref('')
 
 const mailHost = computed(() => (import.meta.env.VITE_MAIL_HOST as string) || window.location.hostname)
 const mailError = computed(() => {
@@ -23,6 +25,10 @@ const mailError = computed(() => {
 })
 
 onMounted(async () => {
+  if (import.meta.env.DEV && (import.meta.env.VITE_USE_MOCK as string | undefined)?.toLowerCase() !== 'false') {
+    mockHint.value = (await import('../mocks')).MOCK_HINT
+  }
+
   if (auth.isLoggedIn) {
     await router.replace('/mail')
     return
@@ -120,7 +126,17 @@ async function submit(): Promise<void> {
           使用完整邮箱地址与密码。凭据只保存在本标签页，关闭即失效。
         </p>
 
-        <form class="mt-7 flex flex-col gap-4" @submit.prevent="submit">
+        <!-- 仅本地开发出现：文案来自 mock 模块，生产构建不会加载 -->
+        <div
+          v-if="mockHint"
+          class="mt-4 flex items-start gap-2 rounded-lg border border-teal/25 bg-teal/8 px-3 py-2 text-[12px] leading-relaxed text-teal"
+        >
+          <FlaskConical class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>{{ mockHint }}</p>
+        </div>
+
+        <!-- novalidate：浏览器原生校验提示跟随系统语言（可能是英文），改用下方中文校验 -->
+        <form class="mt-7 flex flex-col gap-4" novalidate @submit.prevent="submit">
           <AppInput
             v-model="mail"
             label="邮箱地址"

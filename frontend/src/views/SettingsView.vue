@@ -23,10 +23,11 @@ import AppBadge from '../components/ui/AppBadge.vue'
 import { useAuthStore } from '../stores/auth'
 import { useTheme } from '../composables/useTheme'
 import { useToast } from '../composables/useToast'
-import { getAccountById, setAccountPassword } from '../jmap/admin'
+import { getAccountById, listDomains, setAccountPassword } from '../jmap/admin'
 import { formatBytes } from '../utils/format'
+import { describeError } from '../utils/i18n'
 import { readAllowedImageSenders, readDensity, writeDensity } from '../utils/storage'
-import type { AccountRecord } from '../jmap/types'
+import type { AccountRecord, DomainRecord } from '../jmap/types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -34,6 +35,7 @@ const { mode, setMode } = useTheme()
 const toast = useToast()
 
 const account = ref<AccountRecord | null>(null)
+const domains = ref<DomainRecord[]>([])
 const loadingAccount = ref(false)
 const password = ref('')
 const confirmPassword = ref('')
@@ -56,15 +58,31 @@ const passwordError = computed(() => {
   return ''
 })
 
-const aliases = computed(() => Object.values(account.value?.aliases ?? {}))
+const aliases = computed(() => {
+  const fallbackDomain = auth.user.split('@')[1] ?? ''
+  return Object.values(account.value?.aliases ?? {}).map((alias) => {
+    const name = alias.name?.trim() ?? ''
+    // 服务端只存「@ 前面的部分 + domainId」，这里补回完整地址
+    const domain = domains.value.find((item) => item.id === alias.domainId)?.name ?? fallbackDomain
+    return {
+      name,
+      email: name.includes('@') || !domain ? name : `${name}@${domain}`,
+    }
+  })
+})
 
 onMounted(async () => {
   if (!auth.admin) return
   loadingAccount.value = true
   try {
-    account.value = await getAccountById(auth.accountId)
+    const [record, domainList] = await Promise.all([
+      getAccountById(auth.accountId),
+      listDomains().catch(() => [] as DomainRecord[]),
+    ])
+    account.value = record
+    domains.value = domainList
   } catch (err) {
-    loadError.value = '读取账号信息失败，可能是权限不足'
+    loadError.value = describeError(err, '读取账号信息失败，可能是权限不足')
     console.error('[settings] 读取账号失败', err)
   } finally {
     loadingAccount.value = false
@@ -80,8 +98,7 @@ async function changePassword(): Promise<void> {
     confirmPassword.value = ''
     toast.success('密码已更新', '下次登录请使用新密码')
   } catch (err) {
-    const message = err instanceof Error ? err.message : '修改失败'
-    toast.error('修改密码失败', message)
+    toast.error('修改密码失败', describeError(err, '修改失败，请稍后重试'))
   } finally {
     savingPassword.value = false
   }
@@ -160,10 +177,10 @@ function clearAllowedSenders(): void {
                 <div class="mt-1 flex flex-wrap gap-1.5">
                   <span
                     v-for="alias in aliases"
-                    :key="alias.name"
+                    :key="alias.email"
                     class="rounded-md bg-surface-2 px-2 py-0.5 text-[11.5px] text-ink-2"
                   >
-                    {{ alias.name }}@{{ account ? '' : '' }}
+                    {{ alias.email }}
                   </span>
                 </div>
               </div>

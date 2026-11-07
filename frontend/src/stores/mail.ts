@@ -11,6 +11,7 @@ import {
   toggleStar,
 } from '../jmap/mail'
 import type { Email, EmailQueryFilter, Mailbox } from '../jmap/types'
+import { describeError } from '../utils/i18n'
 import { useAuthStore } from './auth'
 
 export type MailFilter = 'all' | 'unread' | 'starred'
@@ -68,7 +69,7 @@ export const useMailStore = defineStore('mail', () => {
       position.value = result.position
       hasMore.value = result.hasMore
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载邮件失败'
+      error.value = describeError(err, '加载邮件失败')
       console.error('[mail] 加载列表失败', err)
     } finally {
       loading.value = false
@@ -150,7 +151,7 @@ export const useMailStore = defineStore('mail', () => {
       }
     } catch (err) {
       console.error('[mail] 读取邮件失败', err)
-      error.value = err instanceof Error ? err.message : '读取邮件失败'
+      error.value = describeError(err, '读取邮件失败')
     } finally {
       loadingEmail.value = false
     }

@@ -25,6 +25,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { formatBytes } from '../utils/format'
+import { describeError, formatNumber } from '../utils/i18n'
 import type { AccountRecord, DomainRecord } from '../jmap/types'
 
 const admin = useAdminStore()
@@ -135,8 +136,7 @@ async function removeAccount(account: AccountRecord): Promise<void> {
     await admin.removeAccount(account.id)
     toast.success('账号已删除', label)
   } catch (err) {
-    const message = err instanceof Error ? err.message : '删除失败'
-    toast.error('删除失败', message)
+    toast.error('删除失败', describeError(err, '账号没能删除，请稍后重试'))
   }
 }
 
@@ -229,9 +229,9 @@ async function refresh(): Promise<void> {
                 <Globe class="h-3 w-3" /> 域名
               </p>
               <p class="mt-1 text-[19px] font-semibold tabular-nums text-ink">
-                {{ admin.domains.length }}
+                {{ formatNumber(admin.domains.length) }}
                 <span class="ml-1 text-[11.5px] font-normal text-ink-3">
-                  / 启用 {{ enabledDomains.length }}
+                  / 启用 {{ formatNumber(enabledDomains.length) }}
                 </span>
               </p>
             </div>
@@ -239,7 +239,7 @@ async function refresh(): Promise<void> {
               <p class="flex items-center gap-1.5 text-[11.5px] text-ink-4">
                 <Users class="h-3 w-3" /> 邮箱账号
               </p>
-              <p class="mt-1 text-[19px] font-semibold tabular-nums text-ink">{{ admin.accountCount }}</p>
+              <p class="mt-1 text-[19px] font-semibold tabular-nums text-ink">{{ formatNumber(admin.accountCount) }}</p>
             </div>
             <div class="rounded-[14px] border border-line bg-surface p-3.5">
               <p class="flex items-center gap-1.5 text-[11.5px] text-ink-4">

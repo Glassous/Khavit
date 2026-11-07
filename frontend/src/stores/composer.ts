@@ -3,7 +3,8 @@ import { defineStore } from 'pinia'
 import { jmap } from '../jmap/client'
 import { saveDraft, sendEmail, type OutgoingAttachment, type OutgoingEmail } from '../jmap/submit'
 import type { Email, EmailAddress } from '../jmap/types'
-import { formatAddress } from '../utils/format'
+import { formatAddress, formatQuoteTime } from '../utils/format'
+import { describeError } from '../utils/i18n'
 import { useAuthStore } from './auth'
 import { useMailStore } from './mail'
 import { useToast } from '../composables/useToast'
@@ -12,7 +13,8 @@ export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
 
 function quoteHtml(email: Email, text: string): string {
   const from = email.from?.[0] ? formatAddress(email.from[0]) : '未知发件人'
-  const when = email.receivedAt ?? email.sentAt ?? ''
+  // 引用块里的时间要本地化，不能直接塞 ISO 串（2026-11-07T01:02:03Z）
+  const when = formatQuoteTime(email.receivedAt ?? email.sentAt)
   const escaped = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -119,9 +121,9 @@ export const useComposerStore = defineStore('composer', () => {
     mode.value = 'forward'
     subject.value = email.subject?.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject ?? ''}`
     const header = [
-      `---------- 转发邮件 ----------`,
+      '---------- 转发的邮件 ----------',
       `发件人：${email.from?.[0]?.email ?? ''}`,
-      `时间：${email.receivedAt ?? email.sentAt ?? ''}`,
+      `时间：${formatQuoteTime(email.receivedAt ?? email.sentAt)}`,
       `主题：${email.subject ?? ''}`,
       '',
     ].join('\n')
@@ -234,8 +236,7 @@ export const useComposerStore = defineStore('composer', () => {
       await Promise.all([auth.refreshMailboxes(), mail.loadFirstPage()])
       return true
     } catch (err) {
-      const message = err instanceof Error ? err.message : '发送失败'
-      toast.error('发送失败', message)
+      toast.error('发送失败', describeError(err, '邮件没能发出去，请稍后重试'))
       console.error('[composer] 发送失败', err)
       return false
     } finally {

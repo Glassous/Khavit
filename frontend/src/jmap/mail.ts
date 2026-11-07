@@ -1,4 +1,5 @@
 import { CORE, MAIL, jmap } from './client'
+import { translateFailure } from '../utils/i18n'
 import type { Email, EmailQueryFilter, EmailQueryResult, Id, Mailbox } from './types'
 
 /** 列表页需要的字段：不含正文，避免无谓流量 */
@@ -90,7 +91,7 @@ export async function listEmails(accountId: Id, params: ListEmailsParams): Promi
 
   // 方法级错误会以 { type, description } 出现在对应 callId 下
   if (res.q?.type) {
-    throw new Error(`查询失败：${res.q.type}`)
+    throw new Error(`查询失败：${translateFailure(res.q.type, res.q.description)}`)
   }
   const query = res.q as unknown as EmailQueryResult
   const emails = (res.g?.list ?? []) as Email[]

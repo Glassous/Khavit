@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { JmapError, jmap } from '../jmap/client'
 import { getMailboxes, summarizeUnread } from '../jmap/mail'
 import { getIdentities } from '../jmap/submit'
+import { describeError } from '../utils/i18n'
 import type { Identity, Mailbox } from '../jmap/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -78,11 +79,9 @@ export const useAuthStore = defineStore('auth', () => {
       return true
     } catch (err) {
       const message =
-        err instanceof JmapError
-          ? err.isAuth
-            ? '邮箱地址或密码不正确'
-            : err.message
-          : '登录失败，请检查服务器连接'
+        err instanceof JmapError && err.isAuth
+          ? '邮箱地址或密码不正确'
+          : describeError(err, '登录失败，请检查服务器连接')
       error.value = message
       jmap.logout()
       return false

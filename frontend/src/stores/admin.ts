@@ -12,6 +12,7 @@ import {
   setAccountQuota,
   updateDomain,
 } from '../jmap/admin'
+import { describeError } from '../utils/i18n'
 import type { AccountRecord, DomainRecord } from '../jmap/types'
 
 export const useAdminStore = defineStore('admin', () => {
@@ -27,7 +28,7 @@ export const useAdminStore = defineStore('admin', () => {
   )
 
   function domainName(domainId: string): string {
-    return domains.value.find((item) => item.id === domainId)?.name ?? '未知域'
+    return domains.value.find((item) => item.id === domainId)?.name ?? '未知域名'
   }
 
   async function load(): Promise<void> {
@@ -38,7 +39,7 @@ export const useAdminStore = defineStore('admin', () => {
       domains.value = domainList
       accounts.value = accountList
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载管理数据失败'
+      error.value = describeError(err, '加载管理数据失败')
       console.error('[admin] 加载失败', err)
     } finally {
       loading.value = false
@@ -47,12 +48,13 @@ export const useAdminStore = defineStore('admin', () => {
 
   async function addDomain(name: string): Promise<boolean> {
     saving.value = true
+    error.value = ''
     try {
       await createDomain(name.trim())
       await load()
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '创建域名失败'
+      error.value = describeError(err, '创建域名失败')
       console.error('[admin] 建域失败', err)
       return false
     } finally {
@@ -73,7 +75,7 @@ export const useAdminStore = defineStore('admin', () => {
       await load()
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '创建账号失败'
+      error.value = describeError(err, '创建账号失败')
       console.error('[admin] 建号失败', err)
       return false
     } finally {
@@ -88,7 +90,7 @@ export const useAdminStore = defineStore('admin', () => {
       await setAccountPassword(id, password)
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '修改密码失败'
+      error.value = describeError(err, '修改密码失败')
       return false
     } finally {
       saving.value = false

@@ -1,4 +1,5 @@
 import { CORE, MAIL, SUBMISSION, jmap } from './client'
+import { fieldLabel, translateFailure } from '../utils/i18n'
 import type { EmailAddress, Id, Identity } from './types'
 
 export async function getIdentities(accountId: Id): Promise<Identity[]> {
@@ -69,10 +70,9 @@ async function createDraft(
   const created = res.created?.draft
   if (!created) {
     const failure = res.notCreated?.draft
-    const detail = failure
-      ? [failure.type, failure.properties?.join(','), failure.description].filter(Boolean).join(' · ')
-      : '未知原因'
-    throw new Error(`草稿创建失败：${detail}`)
+    const fields = (failure?.properties ?? []).map((item) => fieldLabel(item)).join('、')
+    const reason = translateFailure(failure?.type, failure?.description)
+    throw new Error(fields ? `草稿创建失败：${fields}${reason}` : `草稿创建失败：${reason}`)
   }
   return { id: created.id, threadId: created.threadId }
 }
@@ -155,7 +155,7 @@ export async function submitEmail(accountId: Id, params: SubmitParams): Promise<
   const created = res.created?.submission
   if (!created) {
     const failure = res.notCreated?.submission
-    throw new Error(failure?.description ?? failure?.type ?? '发送失败')
+    throw new Error(translateFailure(failure?.type, failure?.description))
   }
   return created.id
 }

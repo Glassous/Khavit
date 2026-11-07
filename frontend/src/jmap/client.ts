@@ -1,5 +1,6 @@
 import type { Id, JmapResponse, JmapSession, MethodCall, MethodResponse, UploadResult } from './types'
 import { readSession, writeSession, clearSession } from '../utils/storage'
+import { translateFailure } from '../utils/i18n'
 
 export const CORE = 'urn:ietf:params:jmap:core'
 export const MAIL = 'urn:ietf:params:jmap:mail'
@@ -9,6 +10,16 @@ export const STALWART = 'urn:stalwart:jmap'
 
 const TIMEOUT = 30_000
 const RETRIES = 2
+
+/**
+ * 本地开发默认使用内置的模拟数据，无需后端也能把界面跑起来。
+ *
+ * - 关掉：在 .env.local 里设 `VITE_USE_MOCK=false`（或直接用生产的 .env 变量）
+ * - 生产：`import.meta.env.DEV` 在 build 时被替换成常量 false，
+ *   下面的 if 分支连同 `import('../mocks')` 会被整块剔除，产物里不含任何演示数据
+ */
+const MOCK_ENABLED =
+  import.meta.env.DEV && (import.meta.env.VITE_USE_MOCK as string | undefined)?.toLowerCase() !== 'false'
 
 export class JmapError extends Error {
   type: string
@@ -107,6 +118,12 @@ export class JmapClient {
   async discover(force = false): Promise<JmapSession> {
     if (this.sessionCache && !force) return this.sessionCache
 
+    if (MOCK_ENABLED) {
+      const { mockSession } = await import('../mocks')
+      this.sessionCache = await mockSession(this.user)
+      return this.sessionCache
+    }
+
     const res = await fetch(this.sessionPath, {
       method: 'GET',
       headers: this.headers({ Accept: 'application/json' }),
@@ -144,6 +161,11 @@ export class JmapClient {
   }
 
   async call(methodCalls: MethodCall[], using: string[] = [CORE, MAIL]): Promise<JmapResponse> {
+    if (MOCK_ENABLED) {
+      const { mockCall } = await import('../mocks')
+      return mockCall(this.user, methodCalls)
+    }
+
     const url = joinUrl(window.location.origin, this.basePath)
     const payload = JSON.stringify({ using, methodCalls })
 
@@ -220,6 +242,11 @@ export class JmapClient {
   }
 
   async upload(file: File): Promise<UploadResult> {
+    if (MOCK_ENABLED) {
+      const { mockUpload } = await import('../mocks')
+      return mockUpload(file, await this.primaryAccountId())
+    }
+
     const session = await this.discover()
     const accountId = await this.primaryAccountId()
     const raw = (session.uploadUrl || '/jmap/upload/{accountId}/').replace('{accountId}', accountId)
@@ -230,8 +257,8 @@ export class JmapClient {
       headers: this.headers({ 'Content-Type': file.type || 'application/octet-stream' }),
       body: file,
       credentials: 'omit',
-    }).catch((err: unknown) => {
-      throw new JmapError('network', `附件上传失败：${String(err)}`)
+    }).catch(() => {
+      throw new JmapError('upload', '附件上传失败，请检查网络连接')
     })
 
     if (!res.ok) {
@@ -242,6 +269,11 @@ export class JmapClient {
 
   /** 下载附件内容（downloadUrl 需要认证头，不能用裸链接） */
   async downloadBlob(blobId: Id, name: string, type = 'application/octet-stream'): Promise<Blob> {
+    if (MOCK_ENABLED) {
+      const { mockDownload } = await import('../mocks')
+      return mockDownload(blobId, name, type)
+    }
+
     const url = await this.downloadUrl(blobId, name, type)
     const res = await fetch(url, { headers: this.headers(), credentials: 'omit' })
     if (!res.ok) {
@@ -268,7 +300,8 @@ export function throwIfError(response: MethodResponse): void {
   if (response[0] === 'error' || (args && typeof args.type === 'string' && !('list' in args))) {
     throw new JmapError(
       args?.type ?? 'unknown',
-      args?.description ?? '邮件服务返回了错误',
+      // 服务端错误码与描述都是英文，界面上一律换成中文提示
+      translateFailure(args?.type, args?.description),
       0,
       args?.description,
       args?.properties,

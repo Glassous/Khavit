@@ -19,7 +19,17 @@ function domainName(domainId: string): string {
 }
 
 function aliasList(account: AccountRecord): string[] {
-  return Object.values(account.aliases ?? {}).map((item) => item.name)
+  // 别名只存「@ 前面的部分 + domainId」，展示时补回完整地址
+  return Object.values(account.aliases ?? {})
+    .map((item) => {
+      const name = item.name?.trim() ?? ''
+      if (!name) return ''
+      if (name.includes('@')) return name
+      const domainId = item.domainId ?? account.domainId
+      const domain = props.domains.find((record) => record.id === domainId)?.name ?? ''
+      return domain ? `${name}@${domain}` : name
+    })
+    .filter(Boolean)
 }
 
 function quotaText(account: AccountRecord): string {

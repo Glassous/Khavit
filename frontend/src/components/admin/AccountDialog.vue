@@ -4,6 +4,7 @@ import { KeyRound } from 'lucide-vue-next'
 import type { AccountRecord, DomainRecord } from '../../jmap/types'
 import { useAdminStore } from '../../stores/admin'
 import { useToast } from '../../composables/useToast'
+import { describeError } from '../../utils/i18n'
 import AppDrawer from '../ui/AppDrawer.vue'
 import AppButton from '../ui/AppButton.vue'
 import AppInput from '../ui/AppInput.vue'
@@ -147,8 +148,7 @@ async function submit(): Promise<void> {
     emit('update:open', false)
     emit('saved')
   } catch (err) {
-    const message = err instanceof Error ? err.message : '保存失败'
-    error.value = message
+    error.value = describeError(err, '保存失败，请稍后重试')
     console.error('[admin] 保存账号失败', err)
   }
 }

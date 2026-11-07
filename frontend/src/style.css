@@ -5,9 +5,15 @@
 /* ---------------------------------------------------------------
    设计令牌：浅色为基，深色为反相（不是简单反色，阴影改亮边）
    --------------------------------------------------------------- */
+/* 字体栈按「简体中文字形优先、拉丁字形其次」排列：
+   macOS 苹方 / Windows 微软雅黑与思源黑体 / Linux 文泉驿，
+   最后才落到西文字体，避免中文回退到笔画不完整的日文字形（Noto Sans JP）。 */
 @theme {
-  --font-sans: 'PingFang SC', 'Noto Sans SC', 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
-  --font-serif: 'Noto Serif SC', 'Songti SC', Georgia, serif;
+  --font-sans:
+    'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Hiragino Sans GB', 'Source Han Sans SC',
+    'Noto Sans SC', 'WenQuanYi Micro Hei', 'Segoe UI', system-ui, sans-serif;
+  --font-serif:
+    'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
 
   --color-canvas: #f7f8fa;
   --color-canvas-deep: #eef1f6;
@@ -80,6 +86,9 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-variant-numeric: tabular-nums;
+    /* 中文按字断行，英文长串（地址、附件名）才需要强制换行 */
+    overflow-wrap: break-word;
+    text-spacing-trim: normal;
   }
 
   *:focus-visible {
