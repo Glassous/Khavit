@@ -7,6 +7,7 @@
 浏览器 ──HTTPS 443──> Nginx ──静态 dist──> 浏览器
                         └──/jmap──> Stalwart 容器 127.0.0.1:443 ──> RocksDB 卷
 邮件客户端 ──25/465/587/993/995──> Stalwart 容器
+Stalwart 容器 ──465──> 第三方 SMTP 中继（出站 25 被封时，见 docs 第 4 节）
 ```
 
 ![收件箱](docs/screenshots/webmail.png)
@@ -20,7 +21,8 @@
 - 一台公网 Linux 服务器（本方案按 2G 内存调优，容器限额 1G）
 - 一个可管理 DNS 的域名，例如 `example.com`，并准备 `mail.example.com` 的 A 记录
 - 已安装 Docker + Docker Compose v2、Nginx、certbot
-- 端口 25 / 465 / 587 / 993 / 995 / 4190 / 443 至少内网可达（25 是否被云厂商封锁见 `docs/dns-and-deliverability.md`）
+- 端口 25 / 465 / 587 / 993 / 995 / 4190 / 443 至少内网可达；出站 25 若被云厂商封禁（腾讯云/阿里云常见），
+  按 `docs/dns-and-deliverability.md` 第 4 节改走第三方中继（465）发信，收信仍在本机
 
 ## 5 分钟上手
 
@@ -112,5 +114,5 @@ data/                     运行时数据（不入库，需自行备份）
 
 - `docs/jmap-contract.md` —— 实测的 JMAP 与管理 API 契约
 - `docs/deployment.md` —— 反代、证书、端口、升级、回滚
-- `docs/dns-and-deliverability.md` —— MX/SPF/DKIM/DMARC/PTR，以及 25 被封时的中继方案
+- `docs/dns-and-deliverability.md` —— MX/SPF/DKIM/DMARC/PTR，以及出站 25 被封时改走腾讯云 SES 中继（465）的完整步骤
 - `docs/memory-tuning.md` —— 2G 下的裁剪项与观测方法

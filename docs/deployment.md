@@ -11,6 +11,7 @@
                └── /.well-known/mta-sts.txt
 
 公网 25 465 587 993 995 4190 ──> Stalwart 容器（不经 Nginx，协议层无法反代）
+Stalwart ──465 TLS──> smtp.qcloudmail.com（出站中继，出站 25 被云厂商封禁时使用）
 ```
 
 容器只把 443 与 8080 绑到回环地址，公网 443 归 Nginx。
@@ -23,6 +24,10 @@
 | 4190 | ManageSieve | 可选 |
 | 443 | Web 前端 + JMAP | 是 |
 | 8080 | setup 向导 / recovery | **否**，只绑 127.0.0.1 |
+
+> 表里的 465 是「客户端 → 本机」的提交端口。出站 25 被封后，Stalwart 另开一条「本机 → 中继」的
+> 465 出站连接，与上表无关，也不需要任何端口映射。出站被判定封禁后的完整处置见
+> `dns-and-deliverability.md` 第 4 节。
 
 ## 2. 初始化（唯一一次）
 
@@ -179,8 +184,11 @@ curl -fsSk https://127.0.0.1:443/healthz/live && echo OK   # 4. 健康检查
 | 登录报 `Unknown client id` | 用 8080 明文访问 WebUI | 用 443 / SSH 隧道 |
 | 报 `Client metadata documents are disabled` | 用 IP 或与 hostname 不符的域名访问 | 统一用 `https://mail.example.com` |
 | 容器 unhealthy | 改了 443 端口或移除 8080 但没改健康检查地址 | 设置 `STALWART_HEALTHCHECK_URL` |
-| 邮件发出但对方收不到 | 出站 25 被封 / PTR 未设 / SPF-DKIM 不匹配 | 见 `dns-and-deliverability.md` |
-| 队列积压 | 同上，或对端拒收 | 看 `docker compose logs` 里的 `queue` 事件 |
+| 邮件发出但对方收不到 | 出站 25 被封 / PTR 未设 / SPF-DKIM 不匹配 | 先跑 `dns-and-deliverability.md` 4.1 的连通性检测，确认被封就走 4 节的中继 |
+| 队列积压 | 出站 25 被封、对端拒收，或中继认证失败 | 看 `docker compose logs` 里的 `queue` 事件；中继相关错误见下三行 |
+| 中继返回 `535` | 用户名不是控制台「发信地址」，或密码用了登录密码 / SecretKey | 按 `dns-and-deliverability.md` 4.4 重设该地址的 SMTP 密码 |
+| 中继返回 `553` / `554` | From 与认证的发信地址不一致 | 为该地址建发信地址（每域 10 个上限），或换中继 |
+| 配了中继仍在直投 / 日志有 `smtp.id-not-found` | 表达式里的路由名对不上，或没执行 ReloadSettings | Management › Actions › ReloadSettings，并用路由列表核对名字 |
 
 ## 9. 安全清单
 
