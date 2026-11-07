@@ -82,6 +82,7 @@ jobs:
     name: 2/3 推送镜像
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     outputs:
       image_id: ${{ steps.push.outputs.image_id }}
     steps:
@@ -95,11 +96,37 @@ jobs:
           docker pull "stalwartlabs/stalwart:${STALWART_TAG}"
           remote_ref="${TCR_REGISTRY}/${TCR_NAMESPACE}/stalwart:${STALWART_TAG}"
           docker tag "stalwartlabs/stalwart:${STALWART_TAG}" "$remote_ref"
-          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
-          # 镜像没变时 push 是幂等的：layer 已存在，不会重复上传
-          docker push "$remote_ref"
           # image ID（config digest）与所在 registry 无关，服务器用它判断要不要重新 pull
-          echo "image_id=$(docker image inspect --format '{{.Id}}' "$remote_ref")" >> "$GITHUB_OUTPUT"
+          image_id=$(docker image inspect --format '{{.Id}}' "$remote_ref")
+          echo "image_id=${image_id}" >> "$GITHUB_OUTPUT"
+
+          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
+
+          # 远端已是同一镜像就跳过推送：
+          # 海外 Runner 推广州的 TCR 很慢，日常部署（镜像没变）不应该走跨境大传输。
+          # 首次播种建议从国内机器（家里/服务器）手动 docker push 一次。
+          remote_config=$(docker manifest inspect "$remote_ref" 2>/dev/null | jq -r '.config.digest // empty' || true)
+          if [ "$remote_config" = "$image_id" ]; then
+            echo "远端镜像未变化（${image_id}），跳过推送"
+            exit 0
+          fi
+
+          # 真要推时（上游镜像更新了）：分次重试，已推完的 layer 会自动跳过（断点续传）
+          ok=0
+          for i in 1 2 3 4 5; do
+            echo "推送尝试 $i/5"
+            if timeout 20m docker push "$remote_ref"; then
+              ok=1
+              break
+            fi
+            echo "推送中断，10 秒后重试（已完成的层不会重传）"
+            sleep 10
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "镜像推送失败。可以在国内机器上手动播种：" >&2
+            echo "  docker tag stalwartlabs/stalwart:${STALWART_TAG} ${remote_ref} && docker push ${remote_ref}" >&2
+            exit 1
+          fi
 
   # ------------------------------------------------------------ 3. 部署
   deploy:
