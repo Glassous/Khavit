@@ -1,5 +1,5 @@
 import { CORE, MAIL, jmap } from './client'
-import { translateFailure } from '../utils/i18n'
+import { fieldLabel, translateFailure } from '../utils/i18n'
 import type { Email, EmailQueryFilter, EmailQueryResult, Id, Mailbox } from './types'
 
 /** 列表页需要的字段：不含正文，避免无谓流量 */
@@ -156,17 +156,57 @@ export interface KeywordPatch {
   [key: string]: boolean | null
 }
 
+interface SetFailure {
+  type?: string
+  description?: string
+  properties?: string[]
+}
+
+/**
+ * Email/set 调用的失败藏在 notUpdated / notDestroyed 里，HTTP 仍是 200。
+ * 之前直接忽略，导致「点了已读但状态不变」这种静默失败，这里统一抛出来。
+ */
+function assertSetSucceeded(
+  res: { notUpdated?: Record<string, SetFailure>; notDestroyed?: Record<string, SetFailure> },
+  action: string,
+): void {
+  const failure = Object.entries(res.notUpdated ?? {})[0] ?? Object.entries(res.notDestroyed ?? {})[0]
+  if (!failure) return
+  const detail = failure[1]
+  const fields = (detail?.properties ?? []).map((item) => fieldLabel(item)).join('、')
+  const reason = translateFailure(detail?.type, detail?.description)
+  const prefix = fields ? `${action}失败（${fields}）` : `${action}失败`
+  throw new Error(`${prefix}：${reason}`)
+}
+
+/**
+ * 修改邮件关键字（$seen / $flagged …）。
+ *
+ * 必须用 JMAP PatchObject 的路径写法 `keywords/<name>`：
+ * 直接发 `{ "$seen": true }` 会被服务端当成 Email 的非法属性，
+ * 返回 notUpdated: invalidProperties，邮件状态永远不变。
+ */
 export async function patchEmailKeywords(
   accountId: Id,
   ids: Id[],
   patch: KeywordPatch,
 ): Promise<void> {
   if (ids.length === 0) return
-  const update: Record<string, KeywordPatch> = {}
+  const entries = Object.entries(patch)
+  const update: Record<string, Record<string, boolean | null>> = {}
   ids.forEach((id) => {
-    update[id] = patch
+    const paths: Record<string, boolean | null> = {}
+    entries.forEach(([keyword, value]) => {
+      paths[`keywords/${keyword}`] = value
+    })
+    update[id] = paths
   })
-  await jmap.callOne('Email/set', { accountId, update }, [CORE, MAIL])
+  const res = await jmap.callOne<{ notUpdated?: Record<string, SetFailure> }>(
+    'Email/set',
+    { accountId, update },
+    [CORE, MAIL],
+  )
+  assertSetSucceeded(res, '更新邮件标记')
 }
 
 export async function markSeen(accountId: Id, ids: Id[], seen = true): Promise<void> {
@@ -184,7 +224,12 @@ export async function moveEmails(accountId: Id, ids: Id[], targetMailboxId: Id):
   ids.forEach((id) => {
     update[id] = { mailboxIds: { [targetMailboxId]: true } }
   })
-  await jmap.callOne('Email/set', { accountId, update }, [CORE, MAIL])
+  const res = await jmap.callOne<{ notUpdated?: Record<string, SetFailure> }>(
+    'Email/set',
+    { accountId, update },
+    [CORE, MAIL],
+  )
+  assertSetSucceeded(res, '移动邮件')
 }
 
 /**
@@ -204,7 +249,12 @@ export async function deleteEmails(
     return 'moved'
   }
 
-  await jmap.callOne('Email/set', { accountId, destroy: ids }, [CORE, MAIL])
+  const res = await jmap.callOne<{ notDestroyed?: Record<string, SetFailure> }>(
+    'Email/set',
+    { accountId, destroy: ids },
+    [CORE, MAIL],
+  )
+  assertSetSucceeded(res, '删除邮件')
   return 'destroyed'
 }
 

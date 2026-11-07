@@ -138,7 +138,38 @@ function pickProps(email: Email, properties?: string[]): Email {
   return out as unknown as Email
 }
 
-/** 支持 `mailboxIds/x`、`keywords/$draft` 这类路径补丁，也兼容 `{ keywords: {...} }` 写法 */
+/** Email 上可写的属性（PatchObject 的顶层键） */
+const WRITABLE_EMAIL_PROPS = new Set([
+  'mailboxIds',
+  'keywords',
+  'from',
+  'to',
+  'cc',
+  'bcc',
+  'replyTo',
+  'sender',
+  'subject',
+  'sentAt',
+  'bodyStructure',
+  'bodyValues',
+  'htmlBody',
+  'textBody',
+  'attachments',
+])
+
+/**
+ * 真实 JMAP 服务端会拒绝 Email 上不存在的属性（notUpdated: invalidProperties），
+ * 这里照做，避免 mock 比服务端宽松、把前端的错误写法掩盖过去。
+ */
+function isWritablePatchKey(key: string): boolean {
+  if (key.includes('/')) {
+    const prop = key.split('/')[0]
+    return prop === 'keywords' || prop === 'mailboxIds'
+  }
+  return WRITABLE_EMAIL_PROPS.has(key)
+}
+
+/** 支持 `mailboxIds/x`、`keywords/$draft` 这类路径补丁，也兼容 `{ keywords: {...} }` 整体替换 */
 function applyPatch(email: Email, patch: Record<string, unknown>): void {
   const target = email as unknown as Record<string, any>
   Object.entries(patch).forEach(([key, value]) => {
@@ -148,18 +179,6 @@ function applyPatch(email: Email, patch: Record<string, unknown>): void {
       if (value === null) delete bag[sub]
       else bag[sub] = value
       target[prop] = bag
-      return
-    }
-    if (key === 'keywords' || key === 'mailboxIds') {
-      target[key] = { ...(value as Record<string, unknown>) }
-      return
-    }
-    // patchEmailKeywords 直接发 { '$seen': true }，也当作关键字补丁处理
-    if (key.startsWith('$')) {
-      const bag = { ...(target.keywords ?? {}) }
-      if (value === null) delete bag[key]
-      else bag[key] = value
-      target.keywords = bag
       return
     }
     target[key] = value
@@ -308,6 +327,11 @@ function dispatch(state: MockState, name: string, args: Record<string, any>, use
         const email = state.emails.find((item) => item.id === id)
         if (!email) {
           notUpdated[id] = { type: 'notFound' }
+          return
+        }
+        const invalid = Object.keys(patch).find((key) => !isWritablePatchKey(key))
+        if (invalid) {
+          notUpdated[id] = { type: 'invalidProperties', properties: [invalid] }
           return
         }
         applyPatch(email, patch)

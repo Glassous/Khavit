@@ -70,7 +70,7 @@ describe('mock 邮件流', () => {
       accountId: 'acc-demo',
       filter: { inMailbox: MAILBOX.inbox, notKeyword: '$seen' },
     })
-    await call('Email/set', { accountId: 'acc-demo', update: { [unread.ids[0]]: { $seen: true } } })
+    await call('Email/set', { accountId: 'acc-demo', update: { [unread.ids[0]]: { 'keywords/$seen': true } } })
 
     const after = await call('Mailbox/get', {})
     const inboxAfter = after.list.find((item: any) => item.role === 'inbox').unreadEmails

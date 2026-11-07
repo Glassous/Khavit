@@ -145,8 +145,14 @@ export const useMailStore = defineStore('mail', () => {
       const email = await getEmail(auth.accountId, id)
       selectedEmail.value = email
       if (email && !email.keywords?.$seen) {
-        await markSeen(auth.accountId, [id], true)
-        applyLocalPatch([id], { $seen: true })
+        try {
+          // 先等服务端确认，再改本地：失败时不能假装已经读过
+          await markSeen(auth.accountId, [id], true)
+          applyLocalPatch([id], { $seen: true })
+        } catch (err) {
+          error.value = describeError(err, '标记已读失败')
+          console.error('[mail] 标记已读失败', err)
+        }
         await auth.refreshMailboxes().catch(() => undefined)
       }
     } catch (err) {
@@ -197,9 +203,14 @@ export const useMailStore = defineStore('mail', () => {
   async function toggleRead(id: string, seen: boolean): Promise<void> {
     if (!auth.accountId) return
     applyLocalPatch([id], { $seen: seen })
-    await markSeen(auth.accountId, [id], seen).catch((err) => {
+    try {
+      await markSeen(auth.accountId, [id], seen)
+    } catch (err) {
+      // 服务端没接受就回滚，避免列表显示已读、重新加载又变回未读
+      applyLocalPatch([id], { $seen: !seen })
+      error.value = describeError(err, '标记已读失败')
       console.error('[mail] 标记已读失败', err)
-    })
+    }
     await auth.refreshMailboxes().catch(() => undefined)
   }
 
@@ -234,7 +245,13 @@ export const useMailStore = defineStore('mail', () => {
   async function bulkRead(ids: string[], seen: boolean): Promise<void> {
     if (!auth.accountId || ids.length === 0) return
     applyLocalPatch(ids, { $seen: seen })
-    await patchEmailKeywords(auth.accountId, ids, { $seen: seen })
+    try {
+      await patchEmailKeywords(auth.accountId, ids, { $seen: seen })
+    } catch (err) {
+      applyLocalPatch(ids, { $seen: !seen })
+      error.value = describeError(err, '批量标记失败')
+      console.error('[mail] 批量标记失败', err)
+    }
     await auth.refreshMailboxes().catch(() => undefined)
   }
 
