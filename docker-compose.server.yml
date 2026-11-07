@@ -1,0 +1,24 @@
+# 服务器（1Panel）覆盖层：与 docker-compose.yml 叠加使用
+# 用法：docker compose -f docker-compose.yml -f docker-compose.server.yml up -d
+#
+# 为什么需要它：
+#   1Panel 的 OpenResty 已经占用宿主机 80/443，Stalwart 不能再绑 127.0.0.1:443，
+#   这里把它落到回环的 8443，由 1Panel 站点反代过来。
+#   邮件协议端口（25/465/587/993/995/4190）仍需直连公网，保持原样。
+name: postal
+
+services:
+  stalwart:
+    # 用 !override 覆盖（而不是追加）base 里的 ports，需要 Docker Compose v2.24+
+    ports: !override
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+      - "995:995"
+      - "4190:4190"
+      - "127.0.0.1:8443:443" # 供 1Panel OpenResty 反代 /jmap
+      - "127.0.0.1:18080:8080" # setup 向导 / recovery，仅本机
+    environment:
+      # 容器内健康检查走容器自己的 443，与宿主机映射无关
+      STALWART_HEALTHCHECK_URL: https://127.0.0.1:443/healthz/live
