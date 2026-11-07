@@ -210,22 +210,32 @@ jobs:
             fi
 
             # --- 2) coscli 配置：同地域机器填内网 endpoint ---
+            # 注意：这里不能用 heredoc。drone-ssh 把脚本传到远端时会剥掉每行的行首缩进，
+            # heredoc 正文里的 YAML 缩进会一起丢掉，coscli 会报
+            # "mapping values are not allowed in this context"。
+            # 所以用 printf 逐行拼，缩进写在字符串字面量里，不受传输层影响。
             ENDPOINT="${COS_ENDPOINT:-cos.${COS_REGION}.myqcloud.com}"
-            cat > "$HOME/.cos.yaml" <<YAML
-            cos:
-              base:
-                secretid: ${COS_SECRET_ID}
-                secretkey: ${COS_SECRET_KEY}
-                protocol: https
-              buckets:
-                - name: ${COS_BUCKET}
-                  alias: deploy
-                  region: ${COS_REGION}
-                  endpoint: ${ENDPOINT}
-                  ofs: false
-            YAML
+            printf '%s\n' \
+              'cos:' \
+              '  base:' \
+              "    secretid: ${COS_SECRET_ID}" \
+              "    secretkey: ${COS_SECRET_KEY}" \
+              '    protocol: https' \
+              '  buckets:' \
+              "    - name: ${COS_BUCKET}" \
+              '      alias: deploy' \
+              "      region: ${COS_REGION}" \
+              "      endpoint: ${ENDPOINT}" \
+              '      ofs: false' \
+              > "$HOME/.cos.yaml"
             chmod 600 "$HOME/.cos.yaml"
             echo "COS endpoint = ${ENDPOINT}"
+            # 结构自检：第 2 行必须是两格缩进的 base，缩进若再被剥掉立刻报出来
+            if ! sed -n '2p' "$HOME/.cos.yaml" | grep -q '^  base:'; then
+              echo "cos.yaml 缩进异常，内容疑似被传输层破坏：" >&2
+              sed 's/secretid:.*/secretid: <隐去>/; s/secretkey:.*/secretkey: <隐去>/' "$HOME/.cos.yaml" >&2
+              exit 1
+            fi
 
             # --- 3) 镜像：digest 未变且本地已存在则跳过下载 ---
             mkdir -p "$APP_DIR"
