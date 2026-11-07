@@ -41,20 +41,31 @@ cd "$APP_DIR"
 docker compose -f docker-compose.yml -f docker-compose.server.yml up -d
 
 echo "=== [3/4] 后端健康检查 ==="
-ok=0
+healthy=0
 for _ in $(seq 1 30); do
   if curl -fsSk --max-time 3 https://127.0.0.1:8443/healthz/live >/dev/null 2>&1; then
-    ok=1
+    healthy=1
     break
   fi
   sleep 2
 done
-if [ "$ok" -ne 1 ]; then
-  echo "后端健康检查超时，最近日志：" >&2
+
+if [ "$healthy" -eq 1 ]; then
+  echo "后端健康（443 正常服务）"
+elif docker logs --tail 200 stalwart 2>&1 | grep -q 'bootstrap mode'; then
+  # 首次部署时容器还没初始化：只监听 8080 的初始化向导，443 不服务。
+  # 这不是部署失败，是一次性的人工步骤，所以这里放行并给出操作提示。
+  echo "⚠️  后端处于 bootstrap 模式（尚未初始化），443 不会响应。"
+  echo "   初始化只需做一次："
+  echo "     1) 本机建隧道：ssh -L 18080:127.0.0.1:18080 <user>@<host>"
+  echo "     2) 浏览器打开 http://127.0.0.1:18080/admin 完成向导"
+  echo "     3) 完成后在服务器执行：docker compose -f docker-compose.yml -f docker-compose.server.yml restart stalwart"
+  echo "   本次部署继续发布前端。"
+else
+  echo "后端未响应 443，且不在 bootstrap 模式，最近日志：" >&2
   docker compose -f docker-compose.yml -f docker-compose.server.yml logs --tail=50 stalwart >&2
   exit 1
 fi
-echo "后端健康"
 
 echo "=== [4/4] 前端 ==="
 rm -rf "$UPLOAD_DIR/out"
