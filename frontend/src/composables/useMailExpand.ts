@@ -2,6 +2,8 @@ import { nextTick, ref } from 'vue'
 import gsap from 'gsap'
 import { Flip } from 'gsap/Flip'
 import { useTopBarAutoHide } from './useTopBarAutoHide'
+import { useMailStore } from '../stores/mail'
+import { pushBackLayer, type BackLayerHandle } from './useMobileBack'
 
 gsap.registerPlugin(Flip)
 
@@ -22,6 +24,14 @@ gsap.registerPlugin(Flip)
 const expandedId = ref('')
 /** 顶栏是否处于正文态 */
 const reading = ref(false)
+/** 移动端正文页的返回键守卫：按返回键等同顶栏返回按钮，退回列表 */
+let readingLayer: BackLayerHandle | null = null
+
+function releaseReadingLayer(): void {
+  const layer = readingLayer
+  readingLayer = null
+  if (layer) void layer.release()
+}
 
 const DURATION = 0.26
 const EASE = 'power2.out'
@@ -92,6 +102,14 @@ export function useMailExpand() {
 
     expandedId.value = id
     reading.value = true
+    // 移动端正文占满整屏：压一层守卫，手机返回键先退回列表
+    readingLayer = pushBackLayer(() => {
+      readingLayer = null
+      const after = () => useMailStore().closeEmail()
+      // 展开动画进行中时 close() 会拒绝执行，等动画收尾后再退
+      if (busy) window.setTimeout(() => void close(after), 320)
+      else void close(after)
+    })
     await nextTick()
 
     if (state) {
@@ -121,6 +139,8 @@ export function useMailExpand() {
     const el = cardOf(expandedId.value)
     const state = el && !reducedMotion() ? Flip.getState(flipTargets(el)) : null
 
+    // 由顶栏返回按钮 / 删除归档主动收起：退掉守卫；手机返回键触发时守卫已被退掉，这里是空操作
+    releaseReadingLayer()
     busy = true
     topBar.reset()
     await fadeOutTopbar()
@@ -148,6 +168,7 @@ export function useMailExpand() {
 
   /** 立刻收起、不做动画：删除/归档后那封邮件已经不在了，别让它慢慢缩回去 */
   function collapse(): void {
+    releaseReadingLayer()
     expandedId.value = ''
     reading.value = false
     busy = false

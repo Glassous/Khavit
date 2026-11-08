@@ -91,7 +91,7 @@ function onPick(files: FileList): void {
             class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
             :aria-label="composer.expanded ? '还原窗口' : '最大化'"
             v-tooltip="composer.expanded ? '还原窗口' : '最大化'"
-            @click="composer.expanded = !composer.expanded"
+            @click="composer.toggleExpanded"
           >
             <component :is="composer.expanded ? ChevronDown : ChevronUp" class="h-4 w-4" />
           </button>

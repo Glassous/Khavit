@@ -25,6 +25,7 @@ import { useDensity } from '../../composables/useDensity'
 import { useConfirm } from '../../composables/useConfirm'
 import { useToast } from '../../composables/useToast'
 import { useIslandPanel } from '../../composables/useIslandPanel'
+import { whenBackLayersSettled } from '../../composables/useMobileBack'
 import { getAccountById, listDomains, setAccountPassword } from '../../jmap/admin'
 import { formatBytes } from '../../utils/format'
 import { describeError } from '../../utils/i18n'
@@ -130,6 +131,8 @@ async function logout(): Promise<void> {
   })
   if (!ok) return
 
+  // 确认框在移动端也是一层返回键守卫，先等它退干净再跳登录页
+  await whenBackLayersSettled()
   auth.logout()
   mail.reset()
   await router.replace('/login')

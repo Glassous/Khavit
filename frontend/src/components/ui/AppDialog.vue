@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from 'vue'
 import { X } from 'lucide-vue-next'
+import { useBackLayer } from '../../composables/useMobileBack'
 
 const props = withDefaults(
   defineProps<{
@@ -18,6 +19,9 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 function close(): void {
   emit('update:open', false)
 }
+
+// 移动端返回键等同点击关闭：只关最上层的对话框
+useBackLayer(() => props.open, close)
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') close()

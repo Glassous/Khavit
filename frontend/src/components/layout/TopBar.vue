@@ -214,8 +214,10 @@ onBeforeUnmount(() => {
     <!-- 响应式顶栏遮罩：顶部完全不透明、向下渐隐到几乎透明（强度与模糊见 .topbar-veil） -->
     <div class="topbar-veil max-lg:block" aria-hidden="true" />
     <!-- 最左侧：品牌标记（纯图标）；响应式下隐藏，位置让给侧栏内的第一行 -->
+    <!-- 面板打开时用 replace 回邮件页：避免历史里留下一条可回退的面板记录 -->
     <RouterLink
       to="/mail"
+      :replace="Boolean(panel)"
       class="ml-1 flex shrink-0 items-center rounded-lg p-1 max-lg:hidden"
       aria-label="Khavit 邮箱"
     >

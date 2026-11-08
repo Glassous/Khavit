@@ -33,7 +33,7 @@ const mail = useMailStore()
 const composer = useComposerStore()
 const router = useRouter()
 const route = useRoute()
-const { isDesktop } = useSidebar()
+const { isDesktop, drawerOpen, closeDrawer } = useSidebar()
 const { panel, toggle: togglePanel } = useIslandPanel()
 
 /* ---------------------------------- 手势 ---------------------------------- */
@@ -149,20 +149,34 @@ function isActive(box: Mailbox): boolean {
   return current === slugOf(box)
 }
 
+/**
+ * 抽屉是移动端的返回键守卫层：导航前必须先把抽屉（连同守卫记录）关干净，
+ * 否则历史里会留下一条「假记录」，之后按返回会退回旧文件夹。
+ * 面板打开时用 replace 换文件夹，避免在历史里留下可回退的面板记录。
+ */
 async function select(box: Mailbox): Promise<void> {
-  await router.push(`/mail/${slugOf(box)}`)
+  if (drawerOpen.value) await closeDrawer()
+  const path = `/mail/${slugOf(box)}`
+  if (panel.value) await router.replace(path)
+  else await router.push(path)
   await mail.selectMailbox(box.id)
-  emit('close')
 }
 
-function compose(): void {
+/** 回邮箱首页：与选文件夹同理，先收抽屉再导航 */
+async function goHome(): Promise<void> {
+  if (drawerOpen.value) await closeDrawer()
+  if (panel.value) await router.replace('/mail')
+  else await router.push('/mail')
+}
+
+async function compose(): Promise<void> {
+  if (drawerOpen.value) await closeDrawer()
   composer.openNew()
-  emit('close')
 }
 
 /** 设置与管理后台是岛内面板：在这里打开/收起，不跳页 */
 async function openPanel(next: IslandPanel): Promise<void> {
-  emit('close')
+  if (drawerOpen.value) await closeDrawer()
   await togglePanel(next)
 }
 </script>
@@ -211,14 +225,14 @@ async function openPanel(next: IslandPanel): Promise<void> {
       桌面端仍由顶栏承担，这里只在抽屉里出现。
     -->
     <div class="flex items-center px-3 pt-3 lg:hidden">
-      <RouterLink
-        to="/mail"
-        class="flex items-center rounded-[10px] p-1"
+      <button
+        type="button"
+        class="flex cursor-pointer items-center rounded-[10px] p-1"
         aria-label="Khavit 邮箱"
-        @click="emit('close')"
+        @click="goHome"
       >
         <BrandMark class="h-7 w-7 text-brand" />
-      </RouterLink>
+      </button>
     </div>
 
     <div class="px-3 pb-1 pt-4 max-lg:pt-2">

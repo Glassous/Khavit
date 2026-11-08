@@ -8,6 +8,7 @@ import { describeError } from '../utils/i18n'
 import { useAuthStore } from './auth'
 import { useMailStore } from './mail'
 import { useToast } from '../composables/useToast'
+import { pushBackLayer, type BackLayerHandle } from '../composables/useMobileBack'
 
 export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
 
@@ -48,6 +49,33 @@ export const useComposerStore = defineStore('composer', () => {
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+  /**
+   * 移动端返回键守卫：写信窗口一层，最大化态再一层。
+   * 返回键先还原窗口，再按一次才关闭写信（与原窗口按钮的语义一致）。
+   */
+  let composerLayer: BackLayerHandle | null = null
+  let expandedLayer: BackLayerHandle | null = null
+
+  /** 依次退掉最大化与写信两层守卫；先退上层，避免下层守卫被跳过留下空记录 */
+  async function releaseComposerLayers(): Promise<void> {
+    const expandedHandle = expandedLayer
+    expandedLayer = null
+    if (expandedHandle) await expandedHandle.release()
+
+    const composerHandle = composerLayer
+    composerLayer = null
+    if (composerHandle) await composerHandle.release()
+  }
+
+  function ensureComposerLayer(): void {
+    if (composerLayer?.active) return
+    composerLayer = pushBackLayer(() => {
+      // 返回键已经退掉守卫记录，这里只同步界面状态并按关闭按钮的规则存草稿
+      composerLayer = null
+      close()
+    })
+  }
+
   const canSend = computed(() => to.value.length > 0 || cc.value.length > 0 || bcc.value.length > 0)
   const title = computed(() => {
     const map: Record<ComposeMode, string> = {
@@ -83,10 +111,16 @@ export const useComposerStore = defineStore('composer', () => {
     }
   }
 
+  /** 界面显示 + 压入返回键守卫（重复打开同一窗口不会重复压栈） */
+  function showComposer(): void {
+    visible.value = true
+    ensureComposerLayer()
+  }
+
   function openNew(): void {
     resetState()
     from.value = auth.primaryIdentity ? { name: auth.primaryIdentity.name, email: auth.primaryIdentity.email } : null
-    visible.value = true
+    showComposer()
   }
 
   function openReply(email: Email, all = false): void {
@@ -113,7 +147,7 @@ export const useComposerStore = defineStore('composer', () => {
     inReplyTo.value = email.messageId ?? undefined
     references.value = [...(email.references ?? []), ...(email.messageId ?? [])]
     from.value = auth.primaryIdentity ? { name: auth.primaryIdentity.name, email: auth.primaryIdentity.email } : null
-    visible.value = true
+    showComposer()
   }
 
   function openForward(email: Email): void {
@@ -130,15 +164,44 @@ export const useComposerStore = defineStore('composer', () => {
     const body = email.bodyValues ? Object.values(email.bodyValues).map((item) => item.value).join('\n') : ''
     text.value = `\n\n${header}${body.slice(0, 8000)}`
     from.value = auth.primaryIdentity ? { name: auth.primaryIdentity.name, email: auth.primaryIdentity.email } : null
-    visible.value = true
+    showComposer()
+  }
+
+  /** 关掉写信界面并退掉返回键守卫（关闭按钮、发送成功、手机返回键共用） */
+  function hideComposer(): void {
+    visible.value = false
+    expanded.value = false
+    void releaseComposerLayers()
+    resetState()
   }
 
   function close(): void {
     if (hasContent.value && autoSaveState.value !== 'saved') {
       void persistDraft()
     }
-    visible.value = false
-    resetState()
+    hideComposer()
+  }
+
+  /**
+   * 最大化 / 还原。最大化在移动端是一整屏浮层，额外压一层守卫：
+   * 返回键先还原窗口，再按一次才真正关闭写信。
+   */
+  function toggleExpanded(): void {
+    if (!visible.value) return
+
+    if (expanded.value) {
+      expanded.value = false
+      const layer = expandedLayer
+      expandedLayer = null
+      void layer?.release()
+      return
+    }
+
+    expanded.value = true
+    expandedLayer = pushBackLayer(() => {
+      expandedLayer = null
+      expanded.value = false
+    })
   }
 
   function scheduleAutoSave(): void {
@@ -231,8 +294,7 @@ export const useComposerStore = defineStore('composer', () => {
         existingDraftId: draftId.value,
       })
       toast.success('邮件已发送')
-      visible.value = false
-      resetState()
+      hideComposer()
       await Promise.all([auth.refreshMailboxes(), mail.loadFirstPage()])
       return true
     } catch (err) {
@@ -268,6 +330,7 @@ export const useComposerStore = defineStore('composer', () => {
     openReply,
     openForward,
     close,
+    toggleExpanded,
     scheduleAutoSave,
     persistDraft,
     uploadFiles,
