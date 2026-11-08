@@ -113,6 +113,13 @@
   textarea::placeholder {
     color: var(--color-ink-4);
   }
+
+  /* 搜索框统一用自定义的清除按钮，隐藏 WebKit 自带那个 */
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
 
 @layer components {

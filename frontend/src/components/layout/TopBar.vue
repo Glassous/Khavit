@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ChevronDown,
-  Command,
   LogOut,
   Menu,
   Moon,
@@ -35,16 +34,36 @@ const { confirm } = useConfirm()
 const searchRef = ref<HTMLInputElement | null>(null)
 const menuOpen = ref(false)
 const searching = ref(false)
+/** 搜索框默认收起成图标，点击后向右展开 */
+const searchOpen = ref(false)
 
 const accountEmail = computed(() => auth.user)
 const initial = computed(() => initialOf(auth.displayName))
 const color = computed(() => avatarColor(auth.user || 'postal'))
 
-function focusSearch(): void {
+async function openSearch(): Promise<void> {
+  searchOpen.value = true
+  await nextTick()
   searchRef.value?.focus()
 }
 
+function focusInput(): void {
+  searchRef.value?.focus()
+}
+
+/** 收起搜索框；若正在搜索则一并清空，避免列表停在过滤状态却看不到输入框 */
+async function closeSearch(): Promise<void> {
+  // 先主动失焦：某些浏览器在父元素 display:none 后仍保留焦点，
+  // 继续输入会悄悄触发搜索（表现为“收起了但还在搜”）
+  searchRef.value?.blur()
+  searchOpen.value = false
+  if (searching.value || mail.searchText) await clearSearch()
+}
+
 async function onSearchInput(event: Event): Promise<void> {
+  // 折叠状态下不再响应输入
+  if (!searchOpen.value) return
+
   const value = (event.target as HTMLInputElement).value
   mail.searchText = value
   searching.value = Boolean(value.trim())
@@ -85,15 +104,16 @@ function onGlobalKey(event: KeyboardEvent): void {
 
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    focusSearch()
+    void openSearch()
     return
   }
   if (event.key === '/' && !typing) {
     event.preventDefault()
-    focusSearch()
+    void openSearch()
+    return
   }
-  if (event.key === 'Escape' && document.activeElement === searchRef.value) {
-    searchRef.value?.blur()
+  if (event.key === 'Escape' && searchOpen.value && !typing) {
+    void closeSearch()
   }
 }
 
@@ -135,42 +155,65 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
     </button>
 
-    <!-- 搜索 -->
-    <div class="mx-auto flex w-full max-w-[520px] items-center">
-      <div
-        class="group flex h-9 w-full items-center gap-2 rounded-[10px] border bg-surface/80 px-3 transition-colors duration-150"
-        :class="searching ? 'border-brand/50' : 'border-line focus-within:border-brand hover:border-line-strong'"
+    <!--
+      搜索：收起时是「图标 + 展开快捷键」的小框，点击后向右平滑展开成大框。
+      两个状态的内容直接切换（display），由容器宽度的过渡把内容"拉"出来/收回去，
+      避免交叉淡入时两套内容叠在一起。
+    -->
+    <div
+      v-if="searchable"
+      class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+      :class="
+        searchOpen
+          ? 'w-[360px] max-w-[52vw] rounded-[20px] border-line bg-surface focus-within:border-brand'
+          : 'w-[62px] rounded-[20px] border-line bg-surface/70 hover:border-line-strong'
+      "
+    >
+      <!-- 收起态：图标 + 展开快捷键 -->
+      <button
+        v-show="!searchOpen"
+        type="button"
+        class="absolute inset-0 flex cursor-pointer items-center justify-start gap-1.5 px-3 transition-colors"
+        aria-label="搜索邮件"
+        title="搜索邮件（/ 或 Ctrl+K）"
+        @click="openSearch"
       >
-        <Search class="h-4 w-4 shrink-0 text-ink-4" />
+        <Search class="h-4 w-4 shrink-0 text-ink-3" :stroke-width="2.1" />
+        <kbd class="rounded border border-line px-1 text-[10.5px] leading-4 text-ink-4">/</kbd>
+      </button>
+
+      <!-- 展开态：左侧关闭图标 + 输入框 + Esc 提示（点击与点输入框一致，只聚焦不关闭） -->
+      <div
+        v-show="searchOpen"
+        class="absolute inset-0 flex items-center gap-2 pl-4 pr-4"
+        @click="focusInput"
+      >
+        <button
+          type="button"
+          class="shrink-0 cursor-pointer rounded p-0.5 text-ink-3 transition-colors hover:text-ink"
+          aria-label="关闭搜索"
+          title="关闭搜索"
+          @click.stop="closeSearch"
+        >
+          <X class="h-4 w-4" :stroke-width="2.1" />
+        </button>
         <input
           ref="searchRef"
           :value="mail.searchText"
           type="search"
-          :disabled="!searchable"
           placeholder="搜索主题、发件人或正文…"
-          class="h-full w-full border-0 bg-transparent p-0 text-[13.5px] text-ink outline-none ring-0 placeholder:text-ink-4 focus:outline-none disabled:cursor-not-allowed"
+          class="h-full w-full min-w-0 border-0 bg-transparent p-0 text-[13.5px] text-ink outline-none ring-0 placeholder:text-ink-4 focus:outline-none"
           aria-label="搜索邮件"
           @input="onSearchInput"
+          @keydown.escape.stop.prevent="closeSearch"
         />
-        <button
-          v-if="searching"
-          type="button"
-          class="cursor-pointer rounded p-0.5 text-ink-3 hover:text-ink"
-          aria-label="清除搜索"
-          @click="clearSearch"
-        >
-          <X class="h-3.5 w-3.5" />
-        </button>
-        <span
-          v-else
-          class="hidden shrink-0 items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[10.5px] text-ink-4 sm:flex"
-        >
-          <Command class="h-2.5 w-2.5" />K
-        </span>
+        <kbd
+          class="shrink-0 select-none rounded border border-line px-1.5 py-0.5 text-[10.5px] leading-4 text-ink-4"
+        >Esc</kbd>
       </div>
     </div>
 
-    <div class="flex shrink-0 items-center gap-1">
+    <div class="ml-auto flex shrink-0 items-center gap-1">
       <button
         type="button"
         class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
