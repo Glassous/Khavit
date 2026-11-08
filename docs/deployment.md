@@ -311,29 +311,37 @@ CLI 亦可（官方 `ghcr.io/stalwartlabs/cli` 镜像，`query BlockedIp` / `del
    - Settings › Network › HTTP：`clientIpSource = xForwardedFor`（`forwardedHops` 保持 `1`，
      前面再加 CDN 时设为 `2`）。之后被封的是真实客户端 IP，且被封地址的请求返回 **403**，
      不再是无声断连，Nginx 日志可直接定位到人。
-   - `SystemSettings.proxyTrustedNetworks = ["172.19.0.0/16"]`：代理自身地址永不进封禁名单
-     （同时免除 HTTP 限流）。
+   - 可选保险：Settings › Security › Allowed IPs 加 `172.19.0.1`（`AllowedIp` 对象永不封禁，
+     且不需要 PROXY protocol）。
+     ⚠️ **不要**把网段填进 `proxyTrustedNetworks` / `Override proxy networks`：该字段的语义是
+     「信任这些网络发 PROXY protocol」，填了之后来自该网段的连接**必须以 PROXY 头开头**，
+     否则连接直接被关闭并记 `network.proxy-error`；而 nginx 的 http 模块根本不发 PROXY protocol，
+     一填就把 Nginx → 容器这条路整段掐断，等于复刻一次本节的故障。
    - Settings › Security › Settings：把 `authBanPeriod` / `scanBanPeriod` 等设成 `1h`～`24h`，
      误封自动过期，而不是永久等人解封。
    - 改完执行 Management › Actions › ReloadSettings。
-2. Nginx 侧（`deploy/nginx/stalwart-proxy.conf`）
-   - `X-Forwarded-For` 用 `$remote_addr` **覆盖**，不要用 `$proxy_add_x_forwarded_for` 追加：
-     Stalwart 会信任这个头，追加等于把客户端自带的伪造值一并透传，
-     攻击者可以伪造成任意地址，甚至把别人的 IP 塞进封禁名单。
+2. Nginx 侧
+   - 必须有 `proxy_set_header X-Forwarded-For ...`（否则 Stalwart 回落成对端地址，等于没配）。
+   - 覆盖（`$remote_addr`）与追加（`$proxy_add_x_forwarded_for`）**都能拿到真实 IP**：
+     Stalwart 按 `forwardedHops` 从右往左取，追加写法里客户端伪造的值落在左侧、取不到。
+     仓库片段用覆盖（更直观）；**1Panel 面板生成的反代就是追加写法，配 `forwardedHops=1` 是安全的，
+     不需要去改面板**（手改面板生成的 location 反而会被下次保存覆盖掉）。
 
 安全性前提：`clientIpSource` 不是 `peer` 时，Stalwart 的 HTTP 端口必须只能经代理访问。
 本方案 443 只绑 `127.0.0.1`，满足该前提。
 
-部署脚本的健康检查不带 `X-Forwarded-For`，会回落到对端地址（网关），因落在
-`proxyTrustedNetworks` 内，不受封禁影响，仍能如实反映通路状态。
+部署脚本的健康检查不带 `X-Forwarded-For`，会回落到对端地址（网关）。`/healthz/live` 既不失败认证、
+路径也不匹配 `scanBanPaths`，不会累加任何计数，所以不需要为它额外做豁免。
 
 
 ## 9. 安全清单
 
 - [ ] 8080 只绑 `127.0.0.1`，setup 完成后 `STALWART_RECOVERY_ADMIN` 清空并重启
       （`STALWART_RECOVERY_MODE` 用完同样清空，恢复模式期间无任何暴力破解防护）
-- [ ] 已配 `Http.clientIpSource=xForwardedFor` + `proxyTrustedNetworks`，且 Nginx 是覆盖而非追加
+- [ ] 已配 `Http.clientIpSource=xForwardedFor`（`forwardedHops` 与前置层数一致），且反代确实会带
       `X-Forwarded-For` —— 否则全体 Web 用户共用网桥网关一个 IP，一次漏扫就能把全站封死
+- [ ] **没有**把网段填进 `proxyTrustedNetworks` / `Override proxy networks`：它要求这些网络的连接
+      带 PROXY protocol，nginx http 模块不发，填了会断掉反代通路
 - [ ] auto-ban 封禁周期已设置（默认永久，误封只能人工解封）
 - [ ] `data/` 权限 700，备份文件不入版本库（`.gitignore` 已排除）
 - [ ] 管理员账号开 2FA（若版本支持）或使用强密码短语

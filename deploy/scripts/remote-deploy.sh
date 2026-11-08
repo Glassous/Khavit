@@ -82,8 +82,8 @@ elif docker logs --tail 200 stalwart 2>&1 | grep 'security.ip-blocked' | grep -q
   echo "      docker compose -f docker-compose.yml -f docker-compose.server.yml up -d stalwart" >&2
   echo "    ssh -L 18080:127.0.0.1:18080 <user>@<host> → http://127.0.0.1:18080/admin" >&2
   echo "    Settings › Security › Blocked IPs 删掉网桥网关，再 Management › Actions › ReloadBlockedIps" >&2
-  echo "  根治：Nginx 传真实客户端 IP + Stalwart 开 clientIpSource=xForwardedFor，" >&2
-  echo "        并把网桥网段加入 proxyTrustedNetworks，步骤见 docs/deployment.md 第 8.1 节。" >&2
+  echo "  根治：反代带 X-Forwarded-For + Stalwart 开 clientIpSource=xForwardedFor，" >&2
+  echo "        步骤见 docs/deployment.md 第 8.1 节（注意不要把网段填进 proxyTrustedNetworks）。" >&2
   exit 1
 else
   echo "后端未响应 443，且不在 bootstrap 模式（容器健康状态：$(container_health)），最近日志：" >&2
