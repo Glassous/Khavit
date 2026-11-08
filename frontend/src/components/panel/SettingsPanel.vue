@@ -142,10 +142,13 @@ async function logout(): Promise<void> {
     :description="auth.user"
     @close="closePanel()"
   >
-    <!-- 内容左对齐（不再居中留白），与标题行同一左边缘 -->
-    <div class="w-full max-w-[820px] px-4 pb-6 pt-2 sm:px-6">
+    <!--
+      内容左对齐（不再居中留白），与标题行同一左边缘。
+      响应式下左右留白收窄到 8px、卡片各自成「岛」，与邮件列表是同一套视觉。
+    -->
+    <div class="w-full max-w-[820px] px-2 pb-4 pt-2 sm:px-6 lg:pb-6">
       <!-- 账号 -->
-      <section class="mb-3 rounded-[14px] border border-line bg-surface-2/40 p-4 sm:mb-4 sm:p-5">
+      <section class="mb-2.5 rounded-[14px] bg-surface p-4 shadow-[0_1px_2px_rgb(15_21_32/0.05)] sm:mb-3 lg:mb-4 lg:border lg:border-line lg:bg-surface-2/40 lg:p-5 lg:shadow-none">
         <div class="flex items-start gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-ghost text-brand">
             <UserRound class="h-5 w-5" />
@@ -189,7 +192,7 @@ async function logout(): Promise<void> {
                 <span
                   v-for="alias in aliases"
                   :key="alias.email"
-                  class="selectable rounded-md bg-surface px-2 py-0.5 text-[11.5px] text-ink-2"
+                  class="selectable rounded-md bg-surface-2 px-2 py-0.5 text-[11.5px] text-ink-2"
                 >
                   {{ alias.email }}
                 </span>
@@ -200,9 +203,9 @@ async function logout(): Promise<void> {
       </section>
 
       <!-- 安全 -->
-      <section v-if="auth.admin" class="mb-3 rounded-[14px] border border-line bg-surface-2/40 p-4 sm:mb-4 sm:p-5">
+      <section v-if="auth.admin" class="mb-2.5 rounded-[14px] bg-surface p-4 shadow-[0_1px_2px_rgb(15_21_32/0.05)] sm:mb-3 lg:mb-4 lg:border lg:border-line lg:bg-surface-2/40 lg:p-5 lg:shadow-none">
         <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-ink-2">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-2">
             <KeyRound class="h-5 w-5" />
           </span>
           <div class="min-w-0 flex-1">
@@ -243,9 +246,9 @@ async function logout(): Promise<void> {
       </section>
 
       <!-- 外观 -->
-      <section class="mb-3 rounded-[14px] border border-line bg-surface-2/40 p-4 sm:mb-4 sm:p-5">
+      <section class="mb-2.5 rounded-[14px] bg-surface p-4 shadow-[0_1px_2px_rgb(15_21_32/0.05)] sm:mb-3 lg:mb-4 lg:border lg:border-line lg:bg-surface-2/40 lg:p-5 lg:shadow-none">
         <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-ink-2">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-2">
             <Monitor class="h-5 w-5" />
           </span>
           <div class="min-w-0 flex-1">
@@ -264,7 +267,7 @@ async function logout(): Promise<void> {
                 :class="
                   mode === option.key
                     ? 'border-brand/40 bg-brand-ghost font-medium text-brand'
-                    : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:bg-surface-2'
+                    : 'border-line bg-surface-2 text-ink-2 hover:border-line-strong hover:text-ink'
                 "
                 @click="setMode(option.key as 'light' | 'dark' | 'system')"
               >
@@ -286,9 +289,9 @@ async function logout(): Promise<void> {
       </section>
 
       <!-- 隐私 -->
-      <section class="mb-3 rounded-[14px] border border-line bg-surface-2/40 p-4 sm:mb-4 sm:p-5">
+      <section class="mb-2.5 rounded-[14px] bg-surface p-4 shadow-[0_1px_2px_rgb(15_21_32/0.05)] sm:mb-3 lg:mb-4 lg:border lg:border-line lg:bg-surface-2/40 lg:p-5 lg:shadow-none">
         <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-ink-2">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-2">
             <ImageOff class="h-5 w-5" />
           </span>
           <div class="min-w-0 flex-1">
@@ -301,7 +304,7 @@ async function logout(): Promise<void> {
               <span
                 v-for="domain in allowedSenders"
                 :key="domain"
-                class="rounded-md border border-line bg-surface px-2 py-0.5 text-[11.5px] text-ink-2"
+                class="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-[11.5px] text-ink-2"
               >
                 {{ domain }}
               </span>
@@ -319,7 +322,7 @@ async function logout(): Promise<void> {
       </section>
 
       <!-- 退出登录 -->
-      <section class="rounded-[14px] border border-line bg-surface-2/40 p-4 sm:p-5">
+      <section class="rounded-[14px] bg-surface p-4 shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:border lg:border-line lg:bg-surface-2/40 lg:p-5 lg:shadow-none">
         <div class="flex items-start gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
             <LogOut class="h-5 w-5" />

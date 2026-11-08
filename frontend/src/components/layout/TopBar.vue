@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
 import { useMailStore } from '../../stores/mail'
 import { useIslandPanel } from '../../composables/useIslandPanel'
+import { PANEL_TITLES } from '../../utils/panel'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useSidebar } from '../../composables/useSidebar'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
@@ -17,8 +18,13 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 
 const mail = useMailStore()
 const router = useRouter()
-/** 设置/管理后台是岛内面板，不再切换顶栏形态；搜索时先把面板收起来 */
-const { open: panelOpen, hide: closePanel } = useIslandPanel()
+/**
+ * 设置/管理后台是岛内面板。响应式下面板占满整屏，顶栏就地换形态：
+ * 汉堡 → 返回键，搜索框 → 面板名，「更多」菜单隐藏。
+ * 桌面端顶栏不受影响（面板自己有标题行，侧栏也还看得见）。
+ */
+const { panel, open: panelOpen, hide: closePanel } = useIslandPanel()
+const panelTitle = computed(() => (panel.value ? PANEL_TITLES[panel.value] : ''))
 
 /** 响应式顶栏的「更多」菜单：用列表筛选替代被隐藏的第二行 */
 const {
@@ -121,6 +127,17 @@ async function clearSearch(): Promise<void> {
   await mail.clearSearch()
 }
 
+/**
+ * 面板一打开就把顶栏拉回可视区：响应式下面板没有自己的标题行，
+ * 顶栏就是它唯一的标题与返回入口；顺带收起搜索框与筛选卡片。
+ */
+watch(panelOpen, (open) => {
+  if (!open) return
+  showTopBar()
+  filterMenu.value = false
+  if (searchOpen.value || searching.value) void closeSearch()
+})
+
 function onGlobalKey(event: KeyboardEvent): void {
   const target = event.target
   const typing =
@@ -164,7 +181,6 @@ onBeforeUnmount(() => {
   >
     <!-- 响应式顶栏遮罩：顶部完全不透明、向下渐隐到几乎透明（强度与模糊见 .topbar-veil） -->
     <div class="topbar-veil max-lg:block" aria-hidden="true" />
-    <!-- 主页面：品牌标记 + 侧栏开关（设置、管理后台改用岛内面板，顶栏形态不再变化） -->
     <!-- 最左侧：品牌标记（纯图标）；响应式下隐藏，位置让给侧栏内的第一行 -->
     <RouterLink
       to="/mail"
@@ -174,9 +190,25 @@ onBeforeUnmount(() => {
       <BrandMark class="h-7 w-7 text-brand" />
     </RouterLink>
 
-    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
+    <!--
+      响应式：面板打开时汉堡按钮就地变成返回键（同一位置、同一尺寸），
+      语义从「打开菜单」换成「关掉面板、回到列表」。
+      底色改用 surface：面板的底色是外壳色，canvas-deep 的圆底会看不见。
+    -->
     <button
-      v-if="showSidebarToggle"
+      v-if="panelOpen"
+      type="button"
+      class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
+      aria-label="返回"
+      v-tooltip="'返回列表'"
+      @click="closePanel"
+    >
+      <ArrowLeft class="h-[22px] w-[22px]" :stroke-width="2.2" />
+    </button>
+
+    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开）；面板打开时让位给返回键 -->
+    <button
+      v-if="showSidebarToggle && !panelOpen"
       type="button"
       class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
@@ -251,8 +283,16 @@ onBeforeUnmount(() => {
       展开宽度按「左右内边距 16×2 + 汉堡 44 + 更多 44 + 两个间距 12×2」扣掉，
       留 4px 余量，保证不会把右侧的更多按钮挤出屏幕。
     -->
+    <!-- 响应式：面板打开时，搜索框的位置换成面板名（与列表页标题同一字号） -->
+    <h1
+      v-if="panelOpen"
+      class="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-ink lg:hidden"
+    >
+      {{ panelTitle }}
+    </h1>
+
     <div
-      v-if="searchable && !selecting"
+      v-if="searchable && !selecting && !panelOpen"
       class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-surface max-lg:focus-within:border-transparent"
       :class="
         searchOpen
@@ -314,7 +354,7 @@ onBeforeUnmount(() => {
       响应式「更多」：呼出卡片筛选 全部 / 未读 / 星标，
       替代被隐藏的列表第二行；桌面端不渲染（列表里自带）。
     -->
-    <div v-if="searchable && !isDesktop && !selecting" class="relative ml-auto" data-filter-menu>
+    <div v-if="searchable && !isDesktop && !selecting && !panelOpen" class="relative ml-auto" data-filter-menu>
       <button
         type="button"
         class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"

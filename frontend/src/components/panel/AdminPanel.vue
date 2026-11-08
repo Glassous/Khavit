@@ -144,14 +144,19 @@ async function refresh(): Promise<void> {
 
 <template>
   <IslandPanel title="管理后台" description="域名与邮箱账号，改动即时生效" @close="closePanel()">
-    <!-- 内容左对齐（不再居中留白），与标题行同一左边缘 -->
-    <div class="w-full max-w-[1040px] px-4 pb-6 pt-2 sm:px-6">
+    <!--
+      内容左对齐（不再居中留白），与标题行同一左边缘。
+      响应式下左右留白收窄到 8px、卡片各自成「岛」，与邮件列表是同一套视觉。
+    -->
+    <div class="w-full max-w-[1040px] px-2 pb-4 pt-2 sm:px-6 lg:pb-6">
       <!--
         分区切换放在内容区顶部（原来是一条独立的二级侧栏）：
         面板宽度有限，横向的分段控件在窄屏也照样能用，不必再靠换路由切分区。
       -->
       <header class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-1 rounded-[12px] border border-line bg-surface-2 p-1">
+        <div
+          class="flex items-center gap-1 rounded-[12px] border border-line bg-surface-2 p-1 max-lg:border-transparent max-lg:bg-surface max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]"
+        >
           <button
             v-for="item in sections"
             :key="item.key"
@@ -200,7 +205,9 @@ async function refresh(): Promise<void> {
 
       <!-- 统计 -->
       <div class="mt-4 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-[14px] border border-line bg-surface-2/40 p-3.5">
+        <div
+          class="rounded-[14px] bg-surface p-3.5 shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:border lg:border-line lg:bg-surface-2/40 lg:shadow-none"
+        >
           <p class="flex items-center gap-1.5 text-[11.5px] text-ink-4">
             <Globe class="h-3 w-3" /> 域名
           </p>
@@ -211,13 +218,17 @@ async function refresh(): Promise<void> {
             </span>
           </p>
         </div>
-        <div class="rounded-[14px] border border-line bg-surface-2/40 p-3.5">
+        <div
+          class="rounded-[14px] bg-surface p-3.5 shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:border lg:border-line lg:bg-surface-2/40 lg:shadow-none"
+        >
           <p class="flex items-center gap-1.5 text-[11.5px] text-ink-4">
             <Users class="h-3 w-3" /> 邮箱账号
           </p>
           <p class="mt-1 text-[19px] font-semibold tabular-nums text-ink">{{ formatNumber(admin.accountCount) }}</p>
         </div>
-        <div class="rounded-[14px] border border-line bg-surface-2/40 p-3.5">
+        <div
+          class="rounded-[14px] bg-surface p-3.5 shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:border lg:border-line lg:bg-surface-2/40 lg:shadow-none"
+        >
           <p class="flex items-center gap-1.5 text-[11.5px] text-ink-4">
             <HardDrive class="h-3 w-3" /> 已用磁盘
           </p>
@@ -229,7 +240,7 @@ async function refresh(): Promise<void> {
 
       <div
         v-if="admin.loading"
-        class="mt-4 flex items-center justify-center gap-2 rounded-[14px] border border-line bg-surface-2/40 py-14 text-[13px] text-ink-3"
+        class="mt-4 flex items-center justify-center gap-2 rounded-[14px] bg-surface py-14 text-[13px] text-ink-3 shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:border lg:border-line lg:bg-surface-2/40 lg:shadow-none"
       >
         <Loader2 class="h-4 w-4 animate-spin" /> 正在加载…
       </div>
