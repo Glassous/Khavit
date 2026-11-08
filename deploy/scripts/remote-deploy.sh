@@ -41,6 +41,8 @@ cd "$APP_DIR"
 docker compose -f docker-compose.yml -f docker-compose.server.yml up -d
 
 echo "=== [3/4] 后端健康检查 ==="
+# 这里的探测特意从宿主机走 127.0.0.1:8443，而不是只看容器状态：
+# 它验证的正是「Nginx → 容器」这条真实用户通路。
 healthy=0
 for _ in $(seq 1 30); do
   if curl -fsSk --max-time 3 https://127.0.0.1:8443/healthz/live >/dev/null 2>&1; then
@@ -49,6 +51,12 @@ for _ in $(seq 1 30); do
   fi
   sleep 2
 done
+
+# 容器内健康检查走容器自己的 127.0.0.1（回环地址永不被封），
+# 用它区分「服务真挂了」和「宿主机到容器这条路被封了」。
+container_health() {
+  docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' stalwart 2>/dev/null || echo unknown
+}
 
 if [ "$healthy" -eq 1 ]; then
   echo "后端健康（443 正常服务）"
@@ -61,8 +69,24 @@ elif docker logs --tail 200 stalwart 2>&1 | grep -q 'bootstrap mode'; then
   echo "     2) 浏览器打开 http://127.0.0.1:18080/admin 完成向导"
   echo "     3) 完成后在服务器执行：docker compose -f docker-compose.yml -f docker-compose.server.yml restart stalwart"
   echo "   本次部署继续发布前端。"
+elif docker logs --tail 200 stalwart 2>&1 | grep 'security.ip-blocked' | grep -q 'listenerId = "https"'; then
+  # 端口发布（127.0.0.1:8443:443）会经过 docker-proxy，容器看到的客户端是网桥网关
+  # （如 172.19.0.1），Nginx 与健康检查共用这一个源地址。auto-ban 一旦命中，
+  # 该地址在所有监听器上被直接断开连接——443 表现为「无响应」，Nginx 返回 502。
+  # 这是配置问题，不是容器崩了，所以不打印 200 行日志，直接给处置步骤。
+  echo "✗ 宿主机 → 容器的 https 通路被 Stalwart auto-ban 掐断（容器健康状态：$(container_health)）。" >&2
+  echo "  原因：反代经 docker-proxy 接入，容器看到的源地址是网桥网关，全体 Web 用户共用一个 IP，" >&2
+  echo "        任何一次扫描/口令错误的计数累加都会把它整段封掉（扫描类路径首次命中即封）。" >&2
+  echo "  解封（恢复模式会暂停 auto-ban，且 8080 只绑回环，最稳）：" >&2
+  echo "    STALWART_RECOVERY_MODE=1 STALWART_RECOVERY_ADMIN='admin:<密码>' \\" >&2
+  echo "      docker compose -f docker-compose.yml -f docker-compose.server.yml up -d stalwart" >&2
+  echo "    ssh -L 18080:127.0.0.1:18080 <user>@<host> → http://127.0.0.1:18080/admin" >&2
+  echo "    Settings › Security › Blocked IPs 删掉网桥网关，再 Management › Actions › ReloadBlockedIps" >&2
+  echo "  根治：Nginx 传真实客户端 IP + Stalwart 开 clientIpSource=xForwardedFor，" >&2
+  echo "        并把网桥网段加入 proxyTrustedNetworks，步骤见 docs/deployment.md 第 8.1 节。" >&2
+  exit 1
 else
-  echo "后端未响应 443，且不在 bootstrap 模式，最近日志：" >&2
+  echo "后端未响应 443，且不在 bootstrap 模式（容器健康状态：$(container_health)），最近日志：" >&2
   docker compose -f docker-compose.yml -f docker-compose.server.yml logs --tail=50 stalwart >&2
   exit 1
 fi

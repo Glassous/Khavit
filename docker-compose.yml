@@ -29,7 +29,12 @@ services:
       # 容器健康检查地址。若将来移除 8080，此处必须先改，否则容器被判 unhealthy
       STALWART_HEALTHCHECK_URL: https://127.0.0.1:443/healthz/live
       # 预设管理员口令（形如 admin:<password>），仅首次 setup 时使用，完成后务必删除
+      # 注意：普通模式下它同样被接受为登录凭据，长期留置等于一个全权限后门
       STALWART_RECOVERY_ADMIN: ${STALWART_RECOVERY_ADMIN:-}
+      # 恢复模式开关（临时排障用）：置 1 后容器只启一个明文 HTTP 监听器（8080）
+      # 且 auto-ban / 限流 / 访问控制全部暂停，用来在被封死或配置写坏时进后台修配置。
+      # 用完必须清空并重启，见 docs/deployment.md 第 8.1 节。
+      STALWART_RECOVERY_MODE: ${STALWART_RECOVERY_MODE:-}
     # 2G 服务器硬约束：限制容器内存，禁止借用 swap 造成系统级 OOM
     mem_limit: ${STALWART_MEM_LIMIT:-1g}
     memswap_limit: ${STALWART_MEM_LIMIT:-1g}

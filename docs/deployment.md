@@ -225,10 +225,116 @@ curl -fsSk https://127.0.0.1:443/healthz/live && echo OK   # 4. 健康检查
 | 中继返回 `535` | 用户名不是控制台「发信地址」，或密码用了登录密码 / SecretKey | 按 `dns-and-deliverability.md` 4.4 重设该地址的 SMTP 密码 |
 | 中继返回 `553` / `554` | From 与认证的发信地址不一致 | 为该地址建发信地址（每域 10 个上限），或换中继 |
 | 配了中继仍在直投 / 日志有 `smtp.id-not-found` | 表达式里的路由名对不上，或没执行 ReloadSettings | Management › Actions › ReloadSettings，并用路由列表核对名字 |
+| 部署在 `[3/4] 后端健康检查` 失败，日志刷 `Blocked IP address (security.ip-blocked) listenerId = "https" remoteIp = 172.19.0.1` | auto-ban 把 docker 网桥网关封了，全体 Web 流量共用这一个源地址 | 见 8.1 |
+| 前端 502 / 「网络请求失败」，但 25/993 收发正常 | 同上（封禁只影响经反代进来的 HTTPS 流量） | 见 8.1 |
+| SSH 隧道 `-L 8443` 打不开后台 | 封禁对所有监听器生效，隧道同样经 docker-proxy 落到被封地址 | 改用恢复模式的 18080，见 8.1 |
+
+### 8.1 Web 全站不可达：auto-ban 封掉了 docker 网桥 IP（实测）
+
+**症状**
+
+- Actions 在 `[3/4] 后端健康检查` 失败，容器日志反复出现
+  `INFO Blocked IP address (security.ip-blocked) listenerId = "https" localPort = 443, remoteIp = 172.19.0.1`；
+- 浏览器/前端报 502 或「网络请求失败」，**但邮件端口 25/465/993 一切正常**；
+- `docker ps` 里容器仍是 healthy —— 因为容器自身的健康检查走容器内 `127.0.0.1`，而回环地址永不被封。
+
+**根因**
+
+端口发布 `127.0.0.1:8443:443` 要经过 docker-proxy，容器看到的客户端地址是**网桥网关**
+（默认分配的 `172.19.0.1`）。于是 Nginx 反代、部署脚本的健康检查、SSH 隧道统统共用这一个源地址
+——全体 Web 用户被折叠成同一个 IP。
+
+Stalwart 的 auto-ban 按来源 IP 累计（阈值可调，位置在 Settings › Security › Settings）：
+
+| 类别 | 默认阈值 | 触发原因 |
+|---|---|---|
+| 认证失败 | 100 / 天 | 所有协议上的登录失败 |
+| 滥用 | 35 / 天 | 失败的 `RCPT TO`（中继尝试/探测收件人） |
+| 挂起 | 150 / 天 | 超时会话 |
+| 扫描 | 30 / 天 | 未知命令/畸形请求；命中 `scanBanPaths`（`.php`、`cgi-bin`、`wp-`、`../` 等）**首次即封** |
+
+封禁周期默认**不设置 = 永久**，且对所有监听器生效：连接一建立就被关闭，早于 TLS 握手，
+客户端只看到 connection reset / 无响应。所以一次漏扫请求、或一批客户端拿着旧密码重试，
+就足以把整个 Web 端永久锁死，而且从客户端侧完全看不出原因。
+
+**确认与解封**
+
+```bash
+# 1) 确认（日志里同时有 listenerId = "https" 与 remoteIp 为网桥网关即可判定）
+docker logs --tail 200 stalwart 2>&1 | grep 'security.ip-blocked'
+
+# 2) 恢复模式：只启 8080 明文监听器，暂停 auto-ban / 限流 / 访问控制
+cd /opt/khavit
+STALWART_RECOVERY_MODE=1 STALWART_RECOVERY_ADMIN='admin:你的密码' \
+  docker compose -f docker-compose.yml -f docker-compose.server.yml up -d stalwart
+
+# 3) 本机建隧道（8080 只绑回环，不要在公网暴露）
+ssh -L 18080:127.0.0.1:18080 <user>@<host>
+# 浏览器打开 http://127.0.0.1:18080/admin
+
+# 4) 后台里：Settings › Security › Blocked IPs → 删除网桥网关条目
+#    （每条的 reason 字段指明触发类别：authFailure / rcptToFailure / loitering / portScanning）
+#    → Management › Actions › ReloadBlockedIps（只删不 reload 不生效）
+
+# 5) 修完关掉恢复模式（两个变量都清空，否则等于留了个全权限后门）
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d stalwart
+```
+
+CLI 亦可（官方 `ghcr.io/stalwartlabs/cli` 镜像，`query BlockedIp` / `delete BlockedIp --ids <id>`
+/ `create Action /ReloadBlockedIps`）。注意**不能从宿主机走 `127.0.0.1:8443`** —— 那条路同样被封，
+要把 CLI 容器接到 compose 同一网络再用 `--url https://stalwart -k`。
+
+> 应急绕行（不必进后台，立即恢复通路）：把网桥网段固定成另一段，网关地址随之改变，自然脱离黑名单。
+> 在 `docker-compose.server.yml` 里加：
+>
+> ```yaml
+> networks:
+>   default:
+>     ipam:
+>       config:
+>         - subnet: 172.28.0.0/16   # 换一段确认未占用的（见下）
+> ```
+>
+> 然后 `docker compose ... down && up -d`。两点注意：
+> - 选段前先 `docker network ls` 与 `ip route` 确认不撞车（Docker 默认从 172.17.0.0/16 起顺序分配，
+>   也可能与云厂商 VPC 网段重叠）；
+> - 这只是换个 IP 逃出黑名单，仍要按下面根治。
+>
+> 另外**建议长期固定网段**：否则 Docker 重新分配后，`proxyTrustedNetworks` /
+> `Allowed IPs` 里写的网段就对不上了，等于白配。
+
+**根治：让封禁落在真实客户端身上，并让代理地址永远豁免**
+
+两处必须一起改，缺一个都不成立：
+
+1. Stalwart 侧
+   - Settings › Network › HTTP：`clientIpSource = xForwardedFor`（`forwardedHops` 保持 `1`，
+     前面再加 CDN 时设为 `2`）。之后被封的是真实客户端 IP，且被封地址的请求返回 **403**，
+     不再是无声断连，Nginx 日志可直接定位到人。
+   - `SystemSettings.proxyTrustedNetworks = ["172.19.0.0/16"]`：代理自身地址永不进封禁名单
+     （同时免除 HTTP 限流）。
+   - Settings › Security › Settings：把 `authBanPeriod` / `scanBanPeriod` 等设成 `1h`～`24h`，
+     误封自动过期，而不是永久等人解封。
+   - 改完执行 Management › Actions › ReloadSettings。
+2. Nginx 侧（`deploy/nginx/stalwart-proxy.conf`）
+   - `X-Forwarded-For` 用 `$remote_addr` **覆盖**，不要用 `$proxy_add_x_forwarded_for` 追加：
+     Stalwart 会信任这个头，追加等于把客户端自带的伪造值一并透传，
+     攻击者可以伪造成任意地址，甚至把别人的 IP 塞进封禁名单。
+
+安全性前提：`clientIpSource` 不是 `peer` 时，Stalwart 的 HTTP 端口必须只能经代理访问。
+本方案 443 只绑 `127.0.0.1`，满足该前提。
+
+部署脚本的健康检查不带 `X-Forwarded-For`，会回落到对端地址（网关），因落在
+`proxyTrustedNetworks` 内，不受封禁影响，仍能如实反映通路状态。
+
 
 ## 9. 安全清单
 
 - [ ] 8080 只绑 `127.0.0.1`，setup 完成后 `STALWART_RECOVERY_ADMIN` 清空并重启
+      （`STALWART_RECOVERY_MODE` 用完同样清空，恢复模式期间无任何暴力破解防护）
+- [ ] 已配 `Http.clientIpSource=xForwardedFor` + `proxyTrustedNetworks`，且 Nginx 是覆盖而非追加
+      `X-Forwarded-For` —— 否则全体 Web 用户共用网桥网关一个 IP，一次漏扫就能把全站封死
+- [ ] auto-ban 封禁周期已设置（默认永久，误封只能人工解封）
 - [ ] `data/` 权限 700，备份文件不入版本库（`.gitignore` 已排除）
 - [ ] 管理员账号开 2FA（若版本支持）或使用强密码短语
 - [ ] Nginx 已加 HSTS / CSP / `X-Frame-Options`
