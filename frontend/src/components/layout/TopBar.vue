@@ -1,23 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  ChevronDown,
-  LogOut,
-  Menu,
-  Moon,
-  Search,
-  Settings,
-  ShieldCheck,
-  Sun,
-  X,
-} from 'lucide-vue-next'
+import { ArrowLeft, Menu, Search, X } from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
-import { useAuthStore } from '../../stores/auth'
 import { useMailStore } from '../../stores/mail'
-import { useTheme } from '../../composables/useTheme'
-import { useConfirm } from '../../composables/useConfirm'
-import { initialOf, avatarColor } from '../../utils/format'
+import { usePageChrome } from '../../composables/usePageChrome'
 
 withDefaults(
   defineProps<{ searchable?: boolean; showSidebarToggle?: boolean; sidebarCollapsed?: boolean }>(),
@@ -25,21 +12,15 @@ withDefaults(
 )
 const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 
-const auth = useAuthStore()
 const mail = useMailStore()
 const router = useRouter()
-const { isDark, toggle } = useTheme()
-const { confirm } = useConfirm()
+/** 次级页面（设置、管理等）在顶栏显示返回键 + 标题，主页面显示品牌 logo */
+const { secondary, title: pageTitle } = usePageChrome()
 
 const searchRef = ref<HTMLInputElement | null>(null)
-const menuOpen = ref(false)
 const searching = ref(false)
 /** 搜索框默认收起成图标，点击后向右展开 */
 const searchOpen = ref(false)
-
-const accountEmail = computed(() => auth.user)
-const initial = computed(() => initialOf(auth.displayName))
-const color = computed(() => avatarColor(auth.user || 'postal'))
 
 async function openSearch(): Promise<void> {
   searchOpen.value = true
@@ -83,17 +64,14 @@ async function clearSearch(): Promise<void> {
   await mail.clearSearch()
 }
 
-async function logout(): Promise<void> {
-  const ok = await confirm({
-    title: '退出登录？',
-    description: '会话凭据会从本标签页清除，草稿保存在服务器上不会丢失。',
-    confirmLabel: '退出',
-    tone: 'danger',
-  })
-  if (!ok) return
-  auth.logout()
-  mail.reset()
-  await router.replace('/login')
+/**
+ * 二级页面的返回：优先退回到上一页；直接打开深链接（没有历史记录）时回邮件首页，
+ * 而不是把用户留在原地。
+ */
+function goBack(): void {
+  const back = window.history.state?.back
+  if (typeof back === 'string' && back) router.back()
+  else void router.replace('/mail')
 }
 
 function onGlobalKey(event: KeyboardEvent): void {
@@ -125,36 +103,57 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
   <header
     class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4"
   >
-    <!-- 最左侧：品牌标记（纯图标） -->
-    <RouterLink
-      to="/mail"
-      class="ml-1 flex shrink-0 items-center rounded-lg p-1"
-      aria-label="Khavit 邮箱"
-    >
-      <BrandMark class="h-7 w-7 text-brand" />
-    </RouterLink>
+    <!--
+      次级页面（设置、管理等）：返回键 + 页面标题，不再占用空间放 logo。
+      主页面：品牌标记 + 侧栏开关。
+    -->
+    <template v-if="secondary">
+      <button
+        type="button"
+        class="-ml-1 flex shrink-0 cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="返回"
+        v-tooltip="'返回'"
+        @click="goBack"
+      >
+        <ArrowLeft class="h-[18px] w-[18px]" :stroke-width="2.1" />
+      </button>
+      <h1 class="min-w-0 truncate text-[15.5px] font-semibold tracking-tight text-ink">
+        {{ pageTitle }}
+      </h1>
+    </template>
 
-    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
-    <button
-      v-if="showSidebarToggle"
-      type="button"
-      class="-ml-3 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
-      aria-label="打开菜单"
-      v-tooltip="'打开菜单'"
-      @click="emit('toggle-sidebar')"
-    >
-      <Menu class="h-6 w-6" :stroke-width="2.1" />
-    </button>
-    <button
-      v-if="showSidebarToggle"
-      type="button"
-      class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
-      :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-      v-tooltip="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-      @click="emit('toggle-sidebar')"
-    >
-      <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
-    </button>
+    <template v-else>
+      <!-- 最左侧：品牌标记（纯图标） -->
+      <RouterLink
+        to="/mail"
+        class="ml-1 flex shrink-0 items-center rounded-lg p-1"
+        aria-label="Khavit 邮箱"
+      >
+        <BrandMark class="h-7 w-7 text-brand" />
+      </RouterLink>
+
+      <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
+      <button
+        v-if="showSidebarToggle"
+        type="button"
+        class="-ml-3 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
+        aria-label="打开菜单"
+        v-tooltip="'打开菜单'"
+        @click="emit('toggle-sidebar')"
+      >
+        <Menu class="h-6 w-6" :stroke-width="2.1" />
+      </button>
+      <button
+        v-if="showSidebarToggle"
+        type="button"
+        class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
+        :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        v-tooltip="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        @click="emit('toggle-sidebar')"
+      >
+        <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
+      </button>
+    </template>
 
     <!--
       搜索：收起时是「图标 + 展开快捷键」的小框，点击后向右平滑展开成大框。
@@ -214,82 +213,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       </div>
     </div>
 
-    <div class="ml-auto flex shrink-0 items-center gap-1">
-      <button
-        type="button"
-        class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
-        :aria-label="isDark ? '切换到浅色' : '切换到深色'"
-        v-tooltip="isDark ? '切换到浅色' : '切换到深色'"
-        @click="toggle"
-      >
-        <component :is="isDark ? Sun : Moon" class="h-4.5 w-4.5" />
-      </button>
-
-      <div class="relative">
-        <button
-          type="button"
-          class="flex cursor-pointer items-center gap-2 rounded-[10px] py-1 pl-1 pr-2 transition-colors hover:bg-surface-2"
-          :aria-label="'账号菜单：' + accountEmail"
-          @click="menuOpen = !menuOpen"
-        >
-          <span
-            class="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold text-white"
-            :class="color"
-          >
-            {{ initial }}
-          </span>
-          <span class="hidden max-w-[140px] truncate text-[13px] text-ink-2 md:block">{{ accountEmail }}</span>
-          <ChevronDown class="hidden h-3.5 w-3.5 text-ink-4 md:block" />
-        </button>
-
-        <transition
-          enter-active-class="transition duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-          enter-from-class="opacity-0 -translate-y-1"
-          leave-active-class="transition duration-100"
-          leave-to-class="opacity-0"
-        >
-          <div
-            v-if="menuOpen"
-            class="absolute right-0 top-[calc(100%+8px)] w-[228px] overflow-hidden rounded-xl border border-line bg-surface p-1.5 shadow-pop"
-          >
-            <div class="border-b border-line px-2.5 py-2">
-              <p class="truncate text-[13px] font-medium text-ink">{{ accountEmail }}</p>
-              <p class="mt-0.5 text-[11.5px] text-ink-3">
-                {{ auth.admin ? '管理员账号' : '普通账号' }}
-              </p>
-            </div>
-
-            <RouterLink
-              to="/settings"
-              class="mt-1 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
-              @click="menuOpen = false"
-            >
-              <Settings class="h-4 w-4" /> 设置
-            </RouterLink>
-
-            <RouterLink
-              v-if="auth.admin"
-              to="/admin/domains"
-              class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
-              @click="menuOpen = false"
-            >
-              <ShieldCheck class="h-4 w-4" /> 管理后台
-            </RouterLink>
-
-            <div class="my-1 h-px bg-line" />
-
-            <button
-              type="button"
-              class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink-2 transition-colors hover:bg-danger/8 hover:text-danger"
-              @click="menuOpen = false; logout()"
-            >
-              <LogOut class="h-4 w-4" /> 退出登录
-            </button>
-          </div>
-        </transition>
-
-        <div v-if="menuOpen" class="fixed inset-0 z-[-1]" @click="menuOpen = false" />
-      </div>
-    </div>
+    <!-- 顶栏只放导航相关控件：深浅色与账号区已移出（主题在设置页、退出在设置页底部） -->
   </header>
 </template>

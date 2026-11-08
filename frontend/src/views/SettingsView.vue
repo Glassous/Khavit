@@ -2,26 +2,25 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  ArrowLeft,
   HardDrive,
   ImageOff,
   KeyRound,
   Loader2,
-  Mail,
+  LogOut,
   Monitor,
   Moon,
-  ShieldCheck,
   Sun,
   Trash2,
   UserRound,
 } from 'lucide-vue-next'
-import AppShell from '../components/layout/AppShell.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppInput from '../components/ui/AppInput.vue'
 import AppSwitch from '../components/ui/AppSwitch.vue'
 import AppBadge from '../components/ui/AppBadge.vue'
 import { useAuthStore } from '../stores/auth'
+import { useMailStore } from '../stores/mail'
 import { useTheme } from '../composables/useTheme'
+import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { getAccountById, listDomains, setAccountPassword } from '../jmap/admin'
 import { formatBytes } from '../utils/format'
@@ -30,8 +29,10 @@ import { readAllowedImageSenders, readDensity, writeDensity } from '../utils/sto
 import type { AccountRecord, DomainRecord } from '../jmap/types'
 
 const auth = useAuthStore()
+const mail = useMailStore()
 const router = useRouter()
 const { mode, setMode } = useTheme()
+const { confirm } = useConfirm()
 const toast = useToast()
 
 const account = ref<AccountRecord | null>(null)
@@ -115,24 +116,26 @@ function clearAllowedSenders(): void {
   allowedSenders.value = []
   toast.success('已清空放行名单')
 }
+
+/** 退出登录：清掉本标签页的会话与邮件缓存，回到登录页 */
+async function logout(): Promise<void> {
+  const ok = await confirm({
+    title: '退出登录？',
+    description: '会话凭据会从本标签页清除，草稿保存在服务器上不会丢失。',
+    confirmLabel: '退出',
+    tone: 'danger',
+  })
+  if (!ok) return
+
+  auth.logout()
+  mail.reset()
+  await router.replace('/login')
+}
 </script>
 
 <template>
-  <AppShell :searchable="false">
-    <div class="min-h-0 flex-1 overflow-y-auto scroll-slim">
-      <div class="mx-auto w-full max-w-[760px] px-4 py-6 sm:px-6">
-        <div class="mb-6 flex items-center gap-2">
-          <button
-            type="button"
-            class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-            aria-label="返回"
-            @click="router.back()"
-          >
-            <ArrowLeft class="h-4 w-4" />
-          </button>
-          <h1 class="text-[20px] font-semibold tracking-tight text-ink">设置</h1>
-        </div>
-
+  <div class="min-h-0 flex-1 overflow-y-auto scroll-slim">
+    <div class="mx-auto w-full max-w-[760px] px-4 py-5 sm:px-6">
         <!-- 账号 -->
         <section class="mb-4 rounded-[14px] border border-line bg-surface p-5">
           <div class="flex items-start gap-3">
@@ -262,7 +265,7 @@ function clearAllowedSenders(): void {
                 </button>
               </div>
 
-              <div class="mt-4 border-t border-line pt-3">
+              <div class="mt-4">
                 <AppSwitch
                   :model-value="compact"
                   label="紧凑列表"
@@ -275,7 +278,7 @@ function clearAllowedSenders(): void {
         </section>
 
         <!-- 隐私 -->
-        <section class="rounded-[14px] border border-line bg-surface p-5">
+        <section class="mb-4 rounded-[14px] border border-line bg-surface p-5">
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-ink-2">
               <ImageOff class="h-5 w-5" />
@@ -307,34 +310,25 @@ function clearAllowedSenders(): void {
           </div>
         </section>
 
-        <!-- 服务信息 -->
-        <section class="mt-4 rounded-[14px] border border-line bg-surface-2/60 p-5">
-          <h2 class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <ShieldCheck class="h-4 w-4 text-teal" /> 服务信息
-          </h2>
-          <dl class="mt-3 grid gap-2 text-[12px] sm:grid-cols-2">
-            <div class="flex items-center gap-2">
-              <dt class="text-ink-4">接口</dt>
-              <dd class="font-medium text-ink-2">JMAP · /jmap/</dd>
+        <!-- 退出登录 -->
+        <section class="rounded-[14px] border border-line bg-surface p-5">
+          <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
+              <LogOut class="h-5 w-5" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <h2 class="text-[14px] font-semibold text-ink">退出登录</h2>
+              <p class="mt-0.5 break-all text-[12.5px] leading-relaxed text-ink-3">
+                退出后本标签页的会话凭据会被清除，{{ auth.user }} 的邮件与草稿仍保留在服务器上。
+              </p>
+              <div class="mt-3">
+                <AppButton variant="danger" size="sm" @click="logout">
+                  退出当前账号
+                </AppButton>
+              </div>
             </div>
-            <div class="flex items-center gap-2">
-              <dt class="text-ink-4">主机</dt>
-              <dd class="truncate font-medium text-ink-2">{{ auth.user.split('@')[1] }}</dd>
-            </div>
-            <div class="flex items-center gap-2">
-              <dt class="text-ink-4">收信</dt>
-              <dd class="font-medium text-ink-2">IMAPS 993</dd>
-            </div>
-            <div class="flex items-center gap-2">
-              <dt class="text-ink-4">发信</dt>
-              <dd class="font-medium text-ink-2">SMTPS 465 / 587</dd>
-            </div>
-          </dl>
-          <p class="mt-3 flex items-center gap-1.5 text-[11.5px] text-ink-4">
-            <Mail class="h-3 w-3" /> 客户端也可直接连接上面的端口使用
-          </p>
+          </div>
         </section>
-      </div>
     </div>
-  </AppShell>
+  </div>
 </template>

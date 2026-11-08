@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ArrowLeft,
   Check,
   Copy,
   Globe,
@@ -12,7 +11,6 @@ import {
   RefreshCw,
   Users,
 } from 'lucide-vue-next'
-import AppShell from '../components/layout/AppShell.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppDialog from '../components/ui/AppDialog.vue'
 import AppDrawer from '../components/ui/AppDrawer.vue'
@@ -147,21 +145,10 @@ async function refresh(): Promise<void> {
 </script>
 
 <template>
-  <AppShell :searchable="false">
-    <div class="flex min-h-0 flex-1">
+  <div class="flex min-h-0 flex-1">
       <!-- 二级导航 -->
       <aside class="hidden w-[208px] shrink-0 flex-col border-r border-line bg-canvas-deep/50 md:flex">
-        <div class="px-3 py-3">
-          <button
-            type="button"
-            class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12.5px] text-ink-3 transition-colors hover:bg-surface/70 hover:text-ink"
-            @click="router.push('/mail')"
-          >
-            <ArrowLeft class="h-3.5 w-3.5" /> 返回邮件
-          </button>
-        </div>
-
-        <nav class="flex-1 px-2">
+        <nav class="flex-1 px-2 pt-3">
           <p class="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-4">管理</p>
           <button
             v-for="item in [
@@ -192,19 +179,14 @@ async function refresh(): Promise<void> {
       <!-- 主区 -->
       <main class="min-w-0 flex-1 overflow-y-auto scroll-slim">
         <div class="mx-auto w-full max-w-[1000px] px-4 py-5 sm:px-6">
-          <header class="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 class="text-[20px] font-semibold tracking-tight text-ink">
-                {{ section === 'domains' ? '域名' : '邮箱账号' }}
-              </h1>
-              <p class="mt-1 text-[12.5px] text-ink-3">
-                {{
-                  section === 'domains'
-                    ? '每个域名对应一组 DNS 记录，添加后把记录配到域名服务商即可收信。'
-                    : '账号是真实邮箱地址，创建后可用 Webmail 或任意 IMAP/SMTP 客户端登录。'
-                }}
-              </p>
-            </div>
+          <header class="flex flex-wrap items-center justify-between gap-3">
+            <p class="min-w-0 text-[12.5px] leading-relaxed text-ink-3">
+              {{
+                section === 'domains'
+                  ? '每个域名对应一组 DNS 记录，添加后把记录配到域名服务商即可收信。'
+                  : '账号是真实邮箱地址，创建后可用 Webmail 或任意 IMAP/SMTP 客户端登录。'
+              }}
+            </p>
 
             <div class="flex items-center gap-2">
               <AppButton size="sm" variant="ghost" :loading="admin.loading" @click="refresh">
@@ -277,7 +259,6 @@ async function refresh(): Promise<void> {
           </p>
         </div>
       </main>
-    </div>
 
     <!-- 新建域名 -->
     <AppDialog
@@ -328,5 +309,5 @@ async function refresh(): Promise<void> {
       :domains="enabledDomains"
       @saved="admin.load()"
     />
-  </AppShell>
+  </div>
 </template>

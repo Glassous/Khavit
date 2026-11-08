@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import AppShell from '../components/layout/AppShell.vue'
-import SideBar from '../components/layout/SideBar.vue'
 import MailList from '../components/mail/MailList.vue'
 import MailReader from '../components/mail/MailReader.vue'
 import Composer from '../components/compose/Composer.vue'
@@ -12,7 +10,6 @@ import { useComposerStore } from '../stores/composer'
 import { useHotkeys } from '../composables/useHotkeys'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
-import { useSidebar } from '../composables/useSidebar'
 import type { Mailbox } from '../jmap/types'
 
 const auth = useAuthStore()
@@ -23,17 +20,7 @@ const router = useRouter()
 const toast = useToast()
 const { confirm } = useConfirm()
 
-const { collapsed: sidebarCollapsed, isDesktop, toggle: toggleSidebar } = useSidebar()
-const sidebarOpen = ref(false)
 const mobileReader = ref(false)
-
-/** 折叠成图标窄栏只在桌面端生效，移动端抽屉始终是完整侧栏 */
-const sidebarRail = computed(() => sidebarCollapsed.value && isDesktop.value)
-
-function onToggleSidebar(): void {
-  if (isDesktop.value) toggleSidebar()
-  else sidebarOpen.value = !sidebarOpen.value
-}
 
 const readingOnMobile = computed(() => mobileReader.value && Boolean(mail.selectedId))
 
@@ -152,29 +139,24 @@ useHotkeys([
 </script>
 
 <template>
-  <AppShell :sidebar-collapsed="sidebarRail" @toggle-sidebar="onToggleSidebar">
-    <template #sidebar>
-      <SideBar :open="sidebarOpen" :collapsed="sidebarRail" @close="sidebarOpen = false" />
-    </template>
+  <main class="flex min-w-0 flex-1">
+    <MailList
+      :class="readingOnMobile ? 'max-lg:hidden' : ''"
+      @select="openEmail"
+    />
 
-    <main class="flex min-w-0 flex-1">
-      <MailList
-        :class="readingOnMobile ? 'max-lg:hidden' : ''"
-        @select="openEmail"
-      />
+    <MailReader
+      :email="mail.selectedEmail"
+      :loading="mail.loadingEmail"
+      :class="readingOnMobile ? '' : 'max-lg:hidden'"
+      @back="backToList"
+      @star="(value) => mail.setStarred(mail.selectedId, value)"
+      @unread="markUnread"
+      @archive="archiveSelected"
+      @remove="removeSelected"
+    />
 
-      <MailReader
-        :email="mail.selectedEmail"
-        :loading="mail.loadingEmail"
-        :class="readingOnMobile ? '' : 'max-lg:hidden'"
-        @back="backToList"
-        @star="(value) => mail.setStarred(mail.selectedId, value)"
-        @unread="markUnread"
-        @archive="archiveSelected"
-        @remove="removeSelected"
-      />
-    </main>
-
+    <!-- 写信浮层自身 Teleport 到 body，挂在这里只是为了跟随邮件页生命周期 -->
     <Composer />
-  </AppShell>
+  </main>
 </template>

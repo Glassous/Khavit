@@ -1,5 +1,7 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { resolveRouteTitle } from '../utils/routeMeta'
+import type { RouteTitleContext } from '../utils/routeMeta'
 
 /**
  * 路由模式由 VITE_ROUTER_MODE 决定，默认 hash：
@@ -46,27 +48,44 @@ const router = createRouter({
       // 不设 title：登录页的标签页就叫 Khavit邮局
       meta: { public: true },
     },
+    /**
+     * 登录后的所有页面共享同一个布局组件：顶栏、侧栏只挂载一次，
+     * 页面切换时只有内容区的 RouterView 变化，顶栏不会重建、不会闪。
+     * meta 说明：
+     * - secondary：次级页面，顶栏显示返回键 + 标题，不显示品牌 logo
+     * - sidebar：需要邮箱侧栏（仅邮件页）
+     * - searchable：顶栏显示搜索框（仅邮件页）
+     */
     {
       path: '/',
-      redirect: '/mail',
-    },
-    {
-      path: '/mail/:mailbox?',
-      name: 'mail',
-      component: () => import('../views/MailView.vue'),
-      meta: { title: '邮件' },
-    },
-    {
-      path: '/settings',
-      name: 'settings',
-      component: () => import('../views/SettingsView.vue'),
-      meta: { title: '设置' },
-    },
-    {
-      path: '/admin/:section?',
-      name: 'admin',
-      component: () => import('../views/AdminView.vue'),
-      meta: { title: '管理', requiresAdmin: true },
+      component: () => import('../components/layout/AppLayout.vue'),
+      children: [
+        { path: '', redirect: '/mail' },
+        {
+          path: 'mail/:mailbox?',
+          name: 'mail',
+          component: () => import('../views/MailView.vue'),
+          meta: { title: '邮件', sidebar: true, searchable: true },
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/SettingsView.vue'),
+          meta: { title: '设置', secondary: true },
+        },
+        {
+          path: 'admin/:section?',
+          name: 'admin',
+          component: () => import('../views/AdminView.vue'),
+          meta: {
+            // 标题跟分区走，顶栏在路由切换的瞬间就能显示正确标题
+            title: (to: RouteTitleContext) =>
+              to.params.section === 'accounts' ? '邮箱账号' : '域名',
+            secondary: true,
+            requiresAdmin: true,
+          },
+        },
+      ],
     },
     {
       path: '/:pathMatch(.*)*',
@@ -102,7 +121,7 @@ router.beforeEach(async (to) => {
 const APP_NAME = 'Khavit邮局'
 
 router.afterEach((to) => {
-  const title = (to.meta.title as string) || ''
+  const title = resolveRouteTitle(to)
   document.title = title ? `${title} · ${APP_NAME}` : APP_NAME
 })
 
