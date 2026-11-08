@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Menu, Search, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, CheckCheck, Menu, MoreHorizontal, Search, Trash2, X } from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
 import { useMailStore } from '../../stores/mail'
 import { usePageChrome } from '../../composables/usePageChrome'
+import { useMailSelection } from '../../composables/useMailSelection'
+import { useSidebar } from '../../composables/useSidebar'
 
 withDefaults(
   defineProps<{ searchable?: boolean; showSidebarToggle?: boolean; sidebarCollapsed?: boolean }>(),
@@ -16,6 +18,48 @@ const mail = useMailStore()
 const router = useRouter()
 /** 次级页面（设置、管理等）在顶栏显示返回键 + 标题，主页面显示品牌 logo */
 const { secondary, title: pageTitle } = usePageChrome()
+
+/** 响应式顶栏的「更多」菜单：用列表筛选替代被隐藏的第二行 */
+const { count: selectedCount, clear: clearSelection, markRead: markSelectedRead, removeSelected } =
+  useMailSelection()
+const { isDesktop } = useSidebar()
+
+/** 响应式多选态：桌面端列表自带批量条，这里只在窄屏接管顶栏 */
+const selecting = computed(() => !isDesktop.value && selectedCount.value > 0)
+
+const filterOptions = [
+  { key: 'all', label: '全部' },
+  { key: 'unread', label: '未读' },
+  { key: 'starred', label: '星标' },
+] as const
+
+const filterMenu = ref(false)
+
+function toggleFilterMenu(): void {
+  filterMenu.value = !filterMenu.value
+}
+
+function pickFilter(key: 'all' | 'unread' | 'starred'): void {
+  mail.setFilter(key)
+  filterMenu.value = false
+}
+
+function onDocumentClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  if (!target?.closest('[data-filter-menu]')) filterMenu.value = false
+}
+
+watch(filterMenu, (open) => {
+  if (open) document.addEventListener('click', onDocumentClick)
+  else document.removeEventListener('click', onDocumentClick)
+})
+
+// 进入多选态时收起搜索与筛选卡片，把空间让给「已选 n 封」和批量按钮
+watch(selecting, (active) => {
+  if (!active) return
+  filterMenu.value = false
+  searchOpen.value = false
+})
 
 const searchRef = ref<HTMLInputElement | null>(null)
 const searching = ref(false)
@@ -96,7 +140,10 @@ function onGlobalKey(event: KeyboardEvent): void {
 }
 
 onMounted(() => window.addEventListener('keydown', onGlobalKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKey)
+  document.removeEventListener('click', onDocumentClick)
+})
 </script>
 
 <template>
@@ -159,6 +206,37 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       >
         <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
       </button>
+
+      <!-- 响应式多选态：搜索的位置换成「已选 n 封」，右侧是批量操作 -->
+      <span v-if="selecting" class="min-w-0 truncate text-[14.5px] font-medium text-ink">
+        已选 {{ selectedCount }} 封
+      </span>
+      <div v-if="selecting" class="ml-auto flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+          aria-label="标记为已读"
+          @click="markSelectedRead"
+        >
+          <CheckCheck class="h-[21px] w-[21px]" :stroke-width="2.2" />
+        </button>
+        <button
+          type="button"
+          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-danger/10 hover:text-danger active:scale-95"
+          aria-label="删除所选"
+          @click="removeSelected"
+        >
+          <Trash2 class="h-[21px] w-[21px]" :stroke-width="2.2" />
+        </button>
+        <button
+          type="button"
+          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+          aria-label="取消选择"
+          @click="clearSelection"
+        >
+          <X class="h-[21px] w-[21px]" :stroke-width="2.2" />
+        </button>
+      </div>
     </template>
 
     <!--
@@ -174,7 +252,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       响应式下换成与侧栏同款的 canvas-deep、去掉边框与快捷键提示，只剩居中的放大镜。
     -->
     <div
-      v-if="searchable"
+      v-if="searchable && !selecting"
       class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-canvas-deep max-lg:focus-within:border-transparent"
       :class="
         searchOpen
@@ -229,6 +307,50 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
           class="shrink-0 select-none rounded border border-line px-1.5 py-0.5 text-[10.5px] leading-4 text-ink-4 max-lg:hidden"
         >Esc</kbd>
       </div>
+    </div>
+
+    <!--
+      响应式「更多」：呼出卡片筛选 全部 / 未读 / 星标，
+      替代被隐藏的列表第二行；桌面端不渲染（列表里自带）。
+    -->
+    <div v-if="searchable && !isDesktop && !selecting" class="relative ml-auto" data-filter-menu>
+      <button
+        type="button"
+        class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="更多"
+        :aria-expanded="filterMenu"
+        @click.stop="toggleFilterMenu"
+      >
+        <MoreHorizontal class="h-[22px] w-[22px]" :stroke-width="2.2" />
+      </button>
+
+      <Transition
+        enter-active-class="transition duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        enter-from-class="opacity-0 -translate-y-1 scale-95"
+        leave-active-class="transition duration-100 ease-in"
+        leave-to-class="opacity-0 -translate-y-1 scale-95"
+      >
+        <div
+          v-if="filterMenu"
+          class="absolute right-0 top-[calc(100%+10px)] z-50 w-[172px] rounded-[14px] border border-line bg-surface p-1.5 shadow-pop"
+        >
+          <button
+            v-for="item in filterOptions"
+            :key="item.key"
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13.5px] transition-colors"
+            :class="
+              mail.filter === item.key
+                ? 'bg-brand-ghost font-medium text-brand'
+                : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+            "
+            @click="pickFilter(item.key)"
+          >
+            <span class="flex-1">{{ item.label }}</span>
+            <Check v-if="mail.filter === item.key" class="h-4 w-4" :stroke-width="2.4" />
+          </button>
+        </div>
+      </Transition>
     </div>
 
     <!-- 顶栏只放导航相关控件：深浅色与账号区已移出（主题在设置页、退出在设置页底部） -->

@@ -1,27 +1,44 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { CheckCheck, Inbox, Loader2, RefreshCw, Star, Trash2 } from 'lucide-vue-next'
 import { useMailStore } from '../../stores/mail'
 import { useAuthStore } from '../../stores/auth'
 import { useToast } from '../../composables/useToast'
-import { useConfirm } from '../../composables/useConfirm'
 import { formatNumber, mailboxLabel } from '../../utils/i18n'
 import MailListItem from './MailListItem.vue'
 import AppSkeleton from '../ui/AppSkeleton.vue'
 import AppEmpty from '../ui/AppEmpty.vue'
 import { useDensity } from '../../composables/useDensity'
+import { useMailSelection } from '../../composables/useMailSelection'
 
 const mail = useMailStore()
 const auth = useAuthStore()
 const toast = useToast()
-const { confirm } = useConfirm()
 /** 紧凑/舒适密度由设置页控制，这里只负责把状态传下去 */
 const { compact } = useDensity()
 
 const emit = defineEmits<{ select: [id: string] }>()
 
 const listRef = ref<HTMLElement | null>(null)
-const selected = ref<Set<string>>(new Set())
+
+/**
+ * 多选与批量操作放在共享的 composable 里：
+ * 响应式下由顶栏接管（已选数量 + 按钮），桌面端仍用这里的勾选框与批量条。
+ */
+const {
+  count: selectedCount,
+  checkedAll,
+  isSelected,
+  toggle,
+  setChecked,
+  toggleAll,
+  clear: clearSelection,
+  markRead: markSelectedRead,
+  removeSelected,
+} = useMailSelection()
+
+/** 有任何选中项时，点击邮件行不再打开邮件，而是切换选中 */
+const selectionMode = computed(() => selectedCount.value > 0)
 
 const filters = [
   { key: 'all', label: '全部' },
@@ -34,23 +51,20 @@ const title = computed(() => {
   return mailboxLabel(mail.currentMailbox)
 })
 
-const checkedAll = computed(
-  () => mail.emails.length > 0 && mail.emails.every((item) => selected.value.has(item.id)),
-)
+// 换文件夹或离开邮件页时清空选中，避免"已选 3 封"跟着跑到别的列表
+watch(() => mail.currentMailboxId, () => clearSelection())
+onBeforeUnmount(() => clearSelection())
 
 function toggleCheck(id: string, checked: boolean): void {
-  const next = new Set(selected.value)
-  if (checked) next.add(id)
-  else next.delete(id)
-  selected.value = next
+  setChecked(id, checked)
 }
 
-function toggleAll(): void {
-  selected.value = checkedAll.value ? new Set() : new Set(mail.emails.map((item) => item.id))
+async function bulkMarkRead(): Promise<void> {
+  await markSelectedRead()
 }
 
-function clearSelection(): void {
-  selected.value = new Set()
+async function bulkDelete(): Promise<void> {
+  await removeSelected()
 }
 
 async function onScroll(event: Event): Promise<void> {
@@ -65,35 +79,6 @@ async function refresh(): Promise<void> {
   toast.success('已刷新')
 }
 
-async function bulkMarkRead(): Promise<void> {
-  const ids = [...selected.value]
-  if (ids.length === 0) return
-  await mail.bulkRead(ids, true)
-  clearSelection()
-  toast.success(`已将 ${ids.length} 封标记为已读`)
-}
-
-async function bulkDelete(): Promise<void> {
-  const ids = [...selected.value]
-  if (ids.length === 0) return
-  const ok = await confirm({
-    title: `删除 ${ids.length} 封邮件？`,
-    description: '在收件箱中删除会移入回收站；在回收站中删除则永久清除，无法恢复。',
-    confirmLabel: '删除',
-    tone: 'danger',
-  })
-  if (!ok) return
-
-  const trash = auth.mailboxByRole('trash')
-  const inTrash = Boolean(trash && mail.currentMailboxId === trash.id)
-
-  // remove() 内部按所在文件夹决定「移入回收站」还是「永久删除」
-  for (const id of ids) {
-    await mail.remove(id)
-  }
-  clearSelection()
-  toast.success(inTrash ? '已永久删除' : '已移入回收站')
-}
 </script>
 
 <template>
@@ -111,9 +96,9 @@ async function bulkDelete(): Promise<void> {
       class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pt-[var(--topbar-safe)]"
       @scroll="onScroll"
     >
-      <!-- 列表头 -->
+      <!-- 列表头：响应式下整行隐藏（标题/计数/刷新交给顶栏与侧栏） -->
       <header
-        class="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 lg:sticky lg:top-0 lg:z-10"
+        class="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 max-lg:hidden lg:sticky lg:top-0 lg:z-10"
       >
         <input
           type="checkbox"
@@ -137,11 +122,11 @@ async function bulkDelete(): Promise<void> {
         </button>
       </header>
 
-      <!-- 筛选 / 批量操作 -->
+      <!-- 筛选 / 批量操作：响应式下隐藏，筛选改由顶栏「更多」卡片承担 -->
       <div
-        class="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-surface px-2 lg:sticky lg:top-12 lg:z-10"
+        class="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-surface px-2 max-lg:hidden lg:sticky lg:top-12 lg:z-10"
       >
-        <template v-if="selected.size === 0">
+        <template v-if="selectedCount === 0">
           <button
             v-for="item in filters"
             :key="item.key"
@@ -162,7 +147,7 @@ async function bulkDelete(): Promise<void> {
         </template>
 
         <template v-else>
-          <span class="px-1 text-[12px] font-medium text-ink">已选 {{ selected.size }} 封</span>
+          <span class="px-1 text-[12px] font-medium text-ink">已选 {{ selectedCount }} 封</span>
           <button
             type="button"
             class="ml-auto cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
@@ -221,9 +206,12 @@ async function bulkDelete(): Promise<void> {
           :key="email.id"
           :email="email"
           :active="mail.selectedId === email.id"
-          :checked="selected.has(email.id)"
+          :checked="isSelected(email.id)"
+          :selected="isSelected(email.id)"
+          :selection-mode="selectionMode"
           :compact="compact"
           @select="(id) => emit('select', id)"
+          @toggle-select="toggle"
           @star="(id, starred) => mail.setStarred(id, starred)"
           @check="toggleCheck"
         />

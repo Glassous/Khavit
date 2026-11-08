@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Paperclip, Star } from 'lucide-vue-next'
+import { Check, Paperclip, Star } from 'lucide-vue-next'
 import type { Email } from '../../jmap/types'
 import { avatarColor, formatAddress, formatListTime, initialOf, truncate } from '../../utils/format'
 
@@ -9,16 +9,56 @@ const props = withDefaults(
     email: Email
     active?: boolean
     checked?: boolean
+    /** 是否已被选中（响应式下由翻牌的头像表示） */
+    selected?: boolean
+    /** 多选态：点击整行改为切换选中，而不是打开邮件 */
+    selectionMode?: boolean
     compact?: boolean
   }>(),
-  { active: false, checked: false, compact: false },
+  { active: false, checked: false, selected: false, selectionMode: false, compact: false },
 )
 
 const emit = defineEmits<{
   select: [id: string]
+  'toggle-select': [id: string]
   star: [id: string, starred: boolean]
   check: [id: string, checked: boolean]
 }>()
+
+/** 长按选中的计时器：触屏长按 420ms 进入选中 */
+const LONG_PRESS_MS = 420
+/** 长按触发后的一小段时间内忽略随后的 click，避免"选中又打开邮件" */
+const CLICK_AFTER_LONG_PRESS = 800
+let pressTimer: number | undefined
+let longPressAt = 0
+
+function clearPressTimer(): void {
+  if (pressTimer !== undefined) {
+    window.clearTimeout(pressTimer)
+    pressTimer = undefined
+  }
+}
+
+function onPointerDown(event: PointerEvent): void {
+  // 鼠标有勾选框与头像可点，不需要长按
+  if (event.pointerType === 'mouse') return
+  clearPressTimer()
+  pressTimer = window.setTimeout(() => {
+    longPressAt = Date.now()
+    emit('toggle-select', props.email.id)
+    navigator.vibrate?.(12)
+  }, LONG_PRESS_MS)
+}
+
+function onRowClick(): void {
+  // 长按已经切换过选中，随后的 click 直接吞掉
+  if (Date.now() - longPressAt < CLICK_AFTER_LONG_PRESS) return
+  if (props.selectionMode) {
+    emit('toggle-select', props.email.id)
+    return
+  }
+  emit('select', props.email.id)
+}
 
 const sender = computed(() => props.email.from?.[0] ?? null)
 const senderLabel = computed(() => formatAddress(sender.value) || '未知发件人')
@@ -39,13 +79,18 @@ const recipients = computed(() => {
 
 <template>
   <div
-    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150 max-lg:px-2"
+    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150"
     :class="[
-      active ? 'bg-brand-ghost' : 'hover:bg-surface-2/70',
+      active || selected ? 'bg-brand-ghost' : 'hover:bg-surface-2/70',
       unread ? 'is-unread' : '',
-      compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5 max-lg:gap-2',
+      compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',
     ]"
-    @click="emit('select', email.id)"
+    @click="onRowClick"
+    @pointerdown="onPointerDown"
+    @pointerup="clearPressTimer"
+    @pointercancel="clearPressTimer"
+    @pointermove="clearPressTimer"
+    @pointerleave="clearPressTimer"
   >
     <!--
       勾选框只在 hover 时显形，触屏上既看不见也点不准，
@@ -63,12 +108,37 @@ const recipients = computed(() => {
       />
     </div>
 
-    <span
-      class="flex shrink-0 items-center justify-center rounded-full font-semibold text-white/95"
-      :class="[color, compact ? 'h-6 w-6 self-center text-[11px]' : 'mt-0.5 h-8 w-8 text-[12px]']"
+    <!--
+      头像：点一下即切换选中；选中时绕 Y 轴翻牌到背面（对号）。
+      正反两面都是圆，preserve-3d + backface-visibility:hidden 保证同一时刻只看到一面。
+    -->
+    <button
+      type="button"
+      class="relative shrink-0 cursor-pointer rounded-full"
+      :class="compact ? 'h-6 w-6 self-center' : 'mt-0.5 h-8 w-8'"
+      :aria-label="selected ? '取消选择这封邮件' : '选择这封邮件'"
+      :aria-pressed="selected"
+      @click.stop="emit('toggle-select', email.id)"
     >
-      {{ initial }}
-    </span>
+      <span class="block h-full w-full [perspective:220px]">
+        <span
+          class="relative block h-full w-full transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] [transform-style:preserve-3d]"
+          :class="selected ? '[transform:rotateY(180deg)]' : ''"
+        >
+          <span
+            class="absolute inset-0 flex items-center justify-center rounded-full font-semibold text-white/95 [backface-visibility:hidden]"
+            :class="[color, compact ? 'text-[11px]' : 'text-[12px]']"
+          >
+            {{ initial }}
+          </span>
+          <span
+            class="absolute inset-0 flex items-center justify-center rounded-full bg-brand text-white [backface-visibility:hidden] [transform:rotateY(180deg)]"
+          >
+            <Check :class="compact ? 'h-3.5 w-3.5' : 'h-[18px] w-[18px]'" :stroke-width="3" />
+          </span>
+        </span>
+      </span>
+    </button>
 
     <div class="min-w-0 flex-1">
       <div class="flex items-baseline gap-2">
