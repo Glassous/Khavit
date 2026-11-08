@@ -12,6 +12,14 @@ import { useDensity } from '../../composables/useDensity'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
 
+const props = withDefaults(
+  defineProps<{
+    /** 响应式下正在展开成正文的那封邮件（空表示都在列表态） */
+    expandedId?: string
+  }>(),
+  { expandedId: '' },
+)
+
 const mail = useMailStore()
 const auth = useAuthStore()
 const toast = useToast()
@@ -19,6 +27,13 @@ const toast = useToast()
 const { compact } = useDensity()
 
 const emit = defineEmits<{ select: [id: string] }>()
+
+/**
+ * 有卡片展开时：列表让出底色（展开的卡片四周 8px 露出外壳色）、
+ * 锁住滚动（正文自己有滚动容器），其它行藏起来但保留占位。
+ * 只在响应式下生效——展开态本身只在窄屏出现（见 useMailExpand）。
+ */
+const expanded = computed(() => Boolean(props.expandedId))
 
 const listRef = ref<HTMLElement | null>(null)
 
@@ -99,11 +114,13 @@ async function refresh(): Promise<void> {
   -->
   <section
     class="flex h-full w-[372px] shrink-0 flex-col border-r border-line bg-surface/40 max-xl:w-[330px] max-lg:h-auto max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:border-r-0 max-lg:bg-transparent"
+    :style="expanded ? { backgroundColor: 'var(--color-canvas-deep)' } : undefined"
   >
     <!-- 列表：桌面端吸顶表头 + 独立滚动；响应式下整页只有这一个滚动容器 -->
     <div
       ref="listRef"
       class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:px-2 max-lg:pb-3 max-lg:pt-[var(--topbar-safe)]"
+      :style="expanded ? { overflow: 'hidden' } : undefined"
       @scroll="onScroll"
     >
       <!-- 响应式标题：跟着列表一起滚动，居左，文案取自当前文件夹（收件箱 / 搜索「…」等） -->
@@ -227,6 +244,10 @@ async function refresh(): Promise<void> {
           :selected="isSelected(email.id)"
           :selection-mode="selectionMode"
           :compact="compact"
+          :expanded="expandedId === email.id"
+          :body-email="expandedId === email.id ? mail.selectedEmail : null"
+          :body-loading="expandedId === email.id ? mail.loadingEmail : false"
+          :dimmed="expanded && expandedId !== email.id"
           @select="(id) => emit('select', id)"
           @toggle-select="toggle"
           @star="(id, starred) => mail.setStarred(id, starred)"

@@ -21,7 +21,7 @@ import { PANEL_TITLES } from '../../utils/panel'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useSidebar } from '../../composables/useSidebar'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
-import { useMobileReader } from '../../composables/useMobileReader'
+import { useMailExpand } from '../../composables/useMailExpand'
 import { useMailActions } from '../../composables/useMailActions'
 
 withDefaults(
@@ -57,7 +57,7 @@ const { hidden: topBarHidden, show: showTopBar } = useTopBarAutoHide()
  * 响应式正文页。正文页自己的工具条在窄屏整条隐藏，功能搬到顶栏：
  * 返回键右边不显示标题，直接是星标 / 未读 / 归档 / 删除这一排按钮。
  */
-const { reading } = useMobileReader()
+const { reading, close: collapseMail } = useMailExpand()
 const { toggleStar, markUnread, archive, remove } = useMailActions()
 const readingMobile = computed(() => !isDesktop.value && reading.value && Boolean(mail.selectedId))
 const starred = computed(() => Boolean(mail.selectedEmail?.keywords?.$flagged))
@@ -65,14 +65,13 @@ const starred = computed(() => Boolean(mail.selectedEmail?.keywords?.$flagged))
 /** 响应式多选态：桌面端列表自带批量条，这里只在窄屏接管顶栏（正文页不参与） */
 const selecting = computed(() => !isDesktop.value && selectedCount.value > 0 && !readingMobile.value)
 
-/** 顶栏返回键：面板打开时关面板，正文页时退回列表 */
+/** 顶栏返回键：面板打开时关面板，正文页时退回列表（卡片反向变回去 + 清当前邮件） */
 function onBack(): void {
   if (panelOpen.value) {
     void closePanel()
     return
   }
-  reading.value = false
-  mail.closeEmail()
+  void collapseMail(() => mail.closeEmail())
 }
 
 const filterOptions = [
@@ -231,6 +230,7 @@ onBeforeUnmount(() => {
     <button
       v-if="panelOpen || readingMobile"
       type="button"
+      data-topbar-swap
       class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="返回"
       v-tooltip="'返回列表'"
@@ -243,6 +243,7 @@ onBeforeUnmount(() => {
     <button
       v-if="showSidebarToggle && !panelOpen && !readingMobile"
       type="button"
+      data-topbar-swap
       class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
       v-tooltip="'打开菜单'"
@@ -255,7 +256,7 @@ onBeforeUnmount(() => {
       响应式正文页：返回键右边不写字，这排邮件操作整体靠右，
       按钮样式与列表页多选态那排一致（同一个尺寸、同一个圆底、同一套 hover）。
     -->
-    <div v-if="readingMobile" class="ml-auto flex min-w-0 shrink-0 items-center gap-0.5">
+    <div v-if="readingMobile" data-topbar-swap class="ml-auto flex min-w-0 shrink-0 items-center gap-0.5">
       <button
         type="button"
         class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep transition-colors duration-150 hover:bg-surface-2 active:scale-95"
@@ -363,6 +364,7 @@ onBeforeUnmount(() => {
     <!-- 响应式：面板打开时，搜索框的位置换成面板名（与列表页标题同一字号） -->
     <h1
       v-if="panelOpen"
+      data-topbar-swap
       class="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-ink lg:hidden"
     >
       {{ panelTitle }}
@@ -370,6 +372,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="searchable && !selecting && !panelOpen && !readingMobile"
+      data-topbar-swap
       class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-surface max-lg:focus-within:border-transparent"
       :class="
         searchOpen
@@ -433,6 +436,7 @@ onBeforeUnmount(() => {
     -->
     <div
       v-if="searchable && !isDesktop && !selecting && !panelOpen && !readingMobile"
+      data-topbar-swap
       class="relative ml-auto"
       data-filter-menu
     >

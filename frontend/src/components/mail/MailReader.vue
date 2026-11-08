@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
-import { ChevronDown, CornerUpLeft, CornerUpRight, ImageOff, Mail, ShieldAlert } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { ChevronDown, CornerUpLeft, Mail, ShieldAlert } from 'lucide-vue-next'
 import type { Email } from '../../jmap/types'
-import { useTheme } from '../../composables/useTheme'
 import { useComposerStore } from '../../stores/composer'
-import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
-import { buildIframeDoc, sanitizeEmailHtml, textToHtml } from '../../utils/renderSafeHtml'
-import { allowImageSender, isImageSenderAllowed } from '../../utils/storage'
-import { avatarColor, domainOf, formatAddress, formatBytes, formatFullTime, initialOf } from '../../utils/format'
+import { avatarColor, formatAddress, formatBytes, formatFullTime, initialOf } from '../../utils/format'
 import MailToolbar from './MailToolbar.vue'
+import MailBody from './MailBody.vue'
 import AttachmentList from './AttachmentList.vue'
 import AppSkeleton from '../ui/AppSkeleton.vue'
 import AppEmpty from '../ui/AppEmpty.vue'
 
+/**
+ * 桌面端右侧阅读区。
+ * 响应式下这里不渲染：正文由列表里的卡片就地展开承担（见 MailListItem + useMailExpand），
+ * 这样「小卡片 → 大卡片」才是同一个 DOM 节点的连续变形，而不是两套界面叠在一起。
+ */
 const props = withDefaults(
   defineProps<{ email: Email | null; loading?: boolean }>(),
   { loading: false },
@@ -25,39 +27,14 @@ const emit = defineEmits<{
   remove: []
 }>()
 
-const { isDark } = useTheme()
 const composer = useComposerStore()
-/** 与列表页共用同一个顶栏状态：正文下滑时顶栏与底部胶囊一起收起 */
-const { hidden: topBarHidden, handleScroll, reset: resetTopBar } = useTopBarAutoHide()
 
-const allowImages = ref(false)
 const showDetails = ref(false)
-const frameRef = ref<HTMLIFrameElement | null>(null)
-const frameHeight = ref(320)
 
 const sender = computed(() => props.email?.from?.[0] ?? null)
 const senderEmail = computed(() => sender.value?.email ?? '')
-const senderDomain = computed(() => domainOf(senderEmail.value))
 const starred = computed(() => Boolean(props.email?.keywords?.$flagged))
 const subject = computed(() => props.email?.subject?.trim() || '(无主题)')
-
-const rawBody = computed(() => {
-  const email = props.email
-  if (!email) return ''
-  const htmlPart = email.htmlBody?.find((part) => part.partId)?.partId
-  if (htmlPart && email.bodyValues?.[htmlPart]?.value) {
-    return email.bodyValues[htmlPart].value
-  }
-  const textPart = email.textBody?.find((part) => part.partId)?.partId
-  if (textPart && email.bodyValues?.[textPart]?.value) {
-    return textToHtml(email.bodyValues[textPart].value)
-  }
-  const anyValue = email.bodyValues ? Object.values(email.bodyValues)[0]?.value : ''
-  return anyValue ? textToHtml(anyValue) : '<p style="color:#8a93a3">（这封邮件没有可显示的正文）</p>'
-})
-
-const sanitized = computed(() => sanitizeEmailHtml(rawBody.value, allowImages.value))
-const iframeDoc = computed(() => buildIframeDoc(sanitized.value.html, isDark.value))
 
 const recipients = computed(() => {
   const email = props.email
@@ -68,60 +45,12 @@ const recipients = computed(() => {
   if (email.bcc?.length) rows.push({ label: '密送', value: email.bcc.map(formatAddress).join('、') })
   return rows
 })
-
-function measure(): void {
-  const doc = frameRef.value?.contentDocument
-  if (!doc?.body) return
-  // 用 body 的内容高度，避免 iframe 自身视口高度把结果撑大
-  const rect = doc.body.getBoundingClientRect()
-  const content = Math.max(Math.ceil(rect.height), doc.body.scrollHeight)
-  frameHeight.value = Math.max(80, Math.min(content + 24, 20000))
-}
-
-async function onFrameLoad(): Promise<void> {
-  await nextTick()
-  measure()
-  // 图片/字体加载后高度会变，补测一次
-  setTimeout(measure, 600)
-}
-
-function showRemoteImages(): void {
-  if (senderDomain.value) allowImageSender(senderDomain.value)
-  allowImages.value = true
-}
-
-/** 响应式正文滚动：驱动顶栏与底部胶囊的收起/恢复（桌面端顶栏没有这套行为，无副作用） */
-function onScroll(event: Event): void {
-  handleScroll((event.target as HTMLElement).scrollTop)
-}
-
-watch(
-  () => props.email?.id,
-  () => {
-    showDetails.value = false
-    frameHeight.value = 320
-    allowImages.value = senderDomain.value ? isImageSenderAllowed(senderDomain.value) : false
-    // 换了一封邮件，滚动位置回到顶部，顶栏也跟着恢复
-    resetTopBar()
-  },
-  { immediate: true },
-)
-
-watch(senderDomain, (domain) => {
-  allowImages.value = domain ? isImageSenderAllowed(domain) : false
-})
 </script>
 
 <template>
-  <!--
-    桌面端：右侧固定阅读区，自带工具条。
-    响应式：和邮件列表同一套——背景交给外壳（canvas-deep）、正文自己是一张白卡，
-    顶部安全距离写成滚动容器的 padding，内容因此会从透明顶栏下方穿过去；
-    工具条与快捷回复都换成顶栏按钮和底部悬浮胶囊。
-  -->
-  <section class="relative flex h-full min-w-0 flex-1 flex-col bg-surface max-lg:bg-transparent">
+  <section class="flex h-full min-w-0 flex-1 flex-col bg-surface">
     <!-- 加载态 -->
-    <div v-if="loading" class="flex-1 p-6 max-lg:pt-[var(--topbar-safe)]">
+    <div v-if="loading" class="flex-1 p-6">
       <div class="flex items-center gap-3">
         <div class="shimmer h-10 w-10 rounded-full" />
         <div class="flex-1">
@@ -156,104 +85,68 @@ watch(senderDomain, (domain) => {
         @forward="composer.openForward(email)"
       />
 
-      <div
-        class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:px-2 max-lg:pb-24 max-lg:pt-[var(--topbar-safe)]"
-        @scroll="onScroll"
-      >
-        <!-- 响应式下「主题 + 发件人 + 正文 + 附件」合成一张白卡；桌面端用 contents 不占位 -->
-        <div
-          class="max-lg:mb-2 max-lg:rounded-[14px] max-lg:bg-surface max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)] lg:contents"
-        >
-          <!-- 主题与发件人 -->
-          <header class="px-4 pb-3 pt-4 sm:px-6">
-            <h1 class="text-[19px] font-semibold leading-snug tracking-tight text-ink">
-              {{ subject }}
-            </h1>
+      <div class="min-h-0 flex-1 overflow-y-auto scroll-slim">
+        <!-- 主题与发件人 -->
+        <header class="px-4 pb-3 pt-4 sm:px-6">
+          <h1 class="text-[19px] font-semibold leading-snug tracking-tight text-ink">
+            {{ subject }}
+          </h1>
 
-            <div class="mt-3 flex items-start gap-3">
-              <span
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white/95"
-                :class="avatarColor(senderEmail)"
-              >
-                {{ initialOf(sender?.name || senderEmail) }}
-              </span>
-
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span class="text-[13.5px] font-medium text-ink">
-                    {{ sender?.name?.trim() || senderEmail || '未知发件人' }}
-                  </span>
-                  <span class="truncate text-[12px] text-ink-3">&lt;{{ senderEmail }}&gt;</span>
-                </div>
-                <button
-                  type="button"
-                  class="mt-0.5 flex cursor-pointer items-center gap-1 text-[11.5px] text-ink-3 transition-colors hover:text-ink"
-                  @click="showDetails = !showDetails"
-                >
-                  发送给 {{ recipients[0]?.value ?? '我' }}
-                  <ChevronDown
-                    class="h-3 w-3 transition-transform duration-150"
-                    :class="showDetails ? 'rotate-180' : ''"
-                  />
-                </button>
-
-                <div v-if="showDetails" class="mt-2 space-y-1 rounded-lg bg-surface-2 px-2.5 py-2">
-                  <p v-for="row in recipients" :key="row.label" class="text-[11.5px] leading-relaxed text-ink-3">
-                    <span class="mr-1.5 text-ink-4">{{ row.label }}</span>{{ row.value }}
-                  </p>
-                  <p class="text-[11.5px] leading-relaxed text-ink-3">
-                    <span class="mr-1.5 text-ink-4">时间</span>{{ formatFullTime(email.receivedAt ?? email.sentAt) }}
-                  </p>
-                  <p class="text-[11.5px] leading-relaxed text-ink-3">
-                    <span class="mr-1.5 text-ink-4">大小</span>{{ formatBytes(email.size) }}
-                    <span v-if="email.attachments?.length" class="ml-2">附件 {{ email.attachments.length }} 个</span>
-                  </p>
-                </div>
-              </div>
-
-              <time class="hidden shrink-0 text-[11.5px] tabular-nums text-ink-4 sm:block">
-                {{ formatFullTime(email.receivedAt ?? email.sentAt) }}
-              </time>
-            </div>
-          </header>
-
-          <!-- 外部图片拦截提示 -->
-          <div
-            v-if="sanitized.blockedImages > 0 && !allowImages"
-            class="mx-4 mb-3 flex items-center gap-2 rounded-lg border border-amber/25 bg-amber/8 px-3 py-2 sm:mx-6"
-          >
-            <ImageOff class="h-3.5 w-3.5 shrink-0 text-amber" />
-            <p class="min-w-0 flex-1 text-[12px] leading-relaxed text-amber">
-              已拦截 {{ sanitized.blockedImages }} 张外部图片，避免发件人追踪。
-            </p>
-            <button
-              type="button"
-              class="shrink-0 cursor-pointer rounded-md border border-amber/30 px-2 py-0.5 text-[11.5px] font-medium text-amber transition-colors hover:bg-amber/10"
-              @click="showRemoteImages"
+          <div class="mt-3 flex items-start gap-3">
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white/95"
+              :class="avatarColor(senderEmail)"
             >
-              显示图片
-            </button>
-          </div>
+              {{ initialOf(sender?.name || senderEmail) }}
+            </span>
 
-          <!-- 正文：sandbox iframe，禁止脚本 -->
-          <div class="px-4 pb-2 sm:px-6">
-            <iframe
-              ref="frameRef"
-              :srcdoc="iframeDoc"
-              sandbox="allow-same-origin allow-popups"
-              referrerpolicy="no-referrer"
-              class="w-full border-0"
-              :style="{ height: `${frameHeight}px` }"
-              title="邮件正文"
-              @load="onFrameLoad"
-            />
-          </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span class="text-[13.5px] font-medium text-ink">
+                  {{ sender?.name?.trim() || senderEmail || '未知发件人' }}
+                </span>
+                <span class="truncate text-[12px] text-ink-3">&lt;{{ senderEmail }}&gt;</span>
+              </div>
+              <button
+                type="button"
+                class="mt-0.5 flex cursor-pointer items-center gap-1 text-[11.5px] text-ink-3 transition-colors hover:text-ink"
+                @click="showDetails = !showDetails"
+              >
+                发送给 {{ recipients[0]?.value ?? '我' }}
+                <ChevronDown
+                  class="h-3 w-3 transition-transform duration-150"
+                  :class="showDetails ? 'rotate-180' : ''"
+                />
+              </button>
 
-          <AttachmentList v-if="email.attachments?.length" :attachments="email.attachments" />
+              <div v-if="showDetails" class="mt-2 space-y-1 rounded-lg bg-surface-2 px-2.5 py-2">
+                <p v-for="row in recipients" :key="row.label" class="text-[11.5px] leading-relaxed text-ink-3">
+                  <span class="mr-1.5 text-ink-4">{{ row.label }}</span>{{ row.value }}
+                </p>
+                <p class="text-[11.5px] leading-relaxed text-ink-3">
+                  <span class="mr-1.5 text-ink-4">时间</span>{{ formatFullTime(email.receivedAt ?? email.sentAt) }}
+                </p>
+                <p class="text-[11.5px] leading-relaxed text-ink-3">
+                  <span class="mr-1.5 text-ink-4">大小</span>{{ formatBytes(email.size) }}
+                  <span v-if="email.attachments?.length" class="ml-2">附件 {{ email.attachments.length }} 个</span>
+                </p>
+              </div>
+            </div>
+
+            <time class="hidden shrink-0 text-[11.5px] tabular-nums text-ink-4 sm:block">
+              {{ formatFullTime(email.receivedAt ?? email.sentAt) }}
+            </time>
+          </div>
+        </header>
+
+        <div class="px-4 pb-2 sm:px-6">
+          <MailBody :email="email" />
         </div>
 
-        <!-- 桌面端的快捷回复 + 沙箱提示（响应式下换成底部悬浮胶囊） -->
-        <div class="px-4 py-4 sm:px-6 max-lg:hidden">
+        <AttachmentList v-if="email.attachments?.length" :attachments="email.attachments" />
+
+        <!-- 快捷回复 -->
+        <div class="px-4 py-4 sm:px-6">
           <button
             type="button"
             class="flex w-full cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-surface-2/60 px-3 py-2.5 text-left text-[12.5px] text-ink-3 transition-colors hover:border-brand/40 hover:bg-surface"
@@ -268,32 +161,6 @@ watch(senderDomain, (domain) => {
             正文在隔离沙箱中渲染，脚本与表单已被移除。
           </p>
         </div>
-      </div>
-
-      <!--
-        响应式：两个大悬浮胶囊（回复 / 转发）。
-        与顶栏共用同一个 hidden 状态，下滑一起收起、上滑一起恢复。
-      -->
-      <div
-        class="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden"
-        :class="topBarHidden ? 'translate-y-[calc(100%+16px)]' : 'translate-y-0'"
-      >
-        <button
-          type="button"
-          class="pointer-events-auto flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-brand text-[15px] font-medium text-white shadow-pop transition-transform duration-150 hover:bg-brand-strong active:scale-[0.98]"
-          @click="composer.openReply(email, false)"
-        >
-          <CornerUpLeft class="h-[17px] w-[17px]" :stroke-width="2.2" />
-          回复
-        </button>
-        <button
-          type="button"
-          class="pointer-events-auto flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border border-line bg-surface text-[15px] font-medium text-ink shadow-pop transition-transform duration-150 active:scale-[0.98]"
-          @click="composer.openForward(email)"
-        >
-          <CornerUpRight class="h-[17px] w-[17px]" :stroke-width="2.2" />
-          转发
-        </button>
       </div>
     </template>
   </section>

@@ -1,7 +1,7 @@
 import { useMailStore } from '../stores/mail'
 import { useConfirm } from './useConfirm'
 import { useToast } from './useToast'
-import { useMobileReader } from './useMobileReader'
+import { useMailExpand } from './useMailExpand'
 
 /**
  * 当前这封邮件的一组操作（星标 / 未读 / 归档 / 删除）。
@@ -13,11 +13,14 @@ export function useMailActions() {
   const mail = useMailStore()
   const toast = useToast()
   const { confirm } = useConfirm()
-  const { reading } = useMobileReader()
+  const { collapse } = useMailExpand()
 
-  /** 响应式正文页退回列表（桌面端调用无副作用） */
+  /**
+   * 邮件已经不在了（删掉/归档/标记未读都会关掉当前邮件），
+   * 展开的卡片直接消失，不做缩回动画。
+   */
   function closeReader(): void {
-    reading.value = false
+    collapse()
   }
 
   function toggleStar(): void {

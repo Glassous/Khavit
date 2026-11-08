@@ -276,6 +276,11 @@
     animation: pop 180ms var(--ease-out-soft) both;
   }
 
+  /* 正文岛 / 附件岛：标题岛变形期间先不出现，变形过半再淡入，不参与形变 */
+  .animate-island-in {
+    animation: island-in 200ms var(--ease-out-soft) 140ms both;
+  }
+
   .shimmer {
     background-image: linear-gradient(
       90deg,
@@ -305,6 +310,17 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes island-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

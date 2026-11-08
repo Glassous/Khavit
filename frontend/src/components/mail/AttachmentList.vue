@@ -6,7 +6,8 @@ import { jmap } from '../../jmap/client'
 import { formatBytes } from '../../utils/format'
 import { useToast } from '../../composables/useToast'
 
-const props = defineProps<{ attachments: Attachment[] }>()
+/** flush：塞进自己的「附件岛」时用，去掉外侧描边与留白 */
+withDefaults(defineProps<{ attachments: Attachment[]; flush?: boolean }>(), { flush: false })
 
 const toast = useToast()
 const downloading = ref<string | null>(null)
@@ -39,7 +40,11 @@ async function download(item: Attachment): Promise<void> {
 </script>
 
 <template>
-  <div v-if="attachments.length" class="flex flex-wrap gap-1.5 border-b border-line px-4 py-2.5 sm:px-6">
+  <div
+    v-if="attachments.length"
+    class="flex flex-wrap gap-1.5"
+    :class="flush ? '' : 'border-b border-line px-4 py-2.5 sm:px-6'"
+  >
     <button
       v-for="item in attachments"
       :key="item.partId"
