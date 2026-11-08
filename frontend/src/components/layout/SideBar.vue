@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Archive,
@@ -17,6 +17,7 @@ import { useMailStore } from '../../stores/mail'
 import { useComposerStore } from '../../stores/composer'
 import { mailboxLabel, roleOrder } from '../../utils/i18n'
 import BrandMark from '../ui/BrandMark.vue'
+import { useSidebar } from '../../composables/useSidebar'
 import type { Mailbox } from '../../jmap/types'
 
 const props = withDefaults(defineProps<{ open?: boolean; collapsed?: boolean }>(), {
@@ -30,6 +31,88 @@ const mail = useMailStore()
 const composer = useComposerStore()
 const router = useRouter()
 const route = useRoute()
+const { isDesktop } = useSidebar()
+
+/* ---------------------------------- 手势 ---------------------------------- */
+
+/**
+ * 抽屉打开时可以用手指拖着收起：位置实时跟手，松手后按位移/速度决定关闭还是弹回。
+ * 只在触屏、且抽屉已打开时生效；竖直方向的手势交还给页面滚动（见 touch-pan-y）。
+ */
+const asideRef = ref<HTMLElement | null>(null)
+const dragging = ref(false)
+/** 相对打开位置的横向位移，始终 <= 0（向左为负） */
+const dragOffset = ref(0)
+
+const AXIS_LOCK = 6
+let startX = 0
+let startY = 0
+let startedAt = 0
+let movedX = 0
+let axis: 'none' | 'x' | 'y' = 'none'
+
+function onDragStart(event: PointerEvent): void {
+  if (isDesktop.value || !props.open || event.pointerType === 'mouse') return
+  dragging.value = true
+  dragOffset.value = 0
+  startX = event.clientX
+  startY = event.clientY
+  startedAt = performance.now()
+  movedX = 0
+  axis = 'none'
+  // 捕获指针，手指滑出抽屉范围也能继续跟手
+  try {
+    asideRef.value?.setPointerCapture(event.pointerId)
+  } catch {
+    /* 个别浏览器/合成事件不支持捕获，退化为普通监听即可 */
+  }
+}
+
+function onDragMove(event: PointerEvent): void {
+  if (!dragging.value) return
+  const dx = event.clientX - startX
+  const dy = event.clientY - startY
+
+  // 先判定主轴：竖向手势直接放弃，让页面正常滚动
+  if (axis === 'none') {
+    if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return
+    axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+    if (axis === 'y') {
+      dragging.value = false
+      dragOffset.value = 0
+      return
+    }
+  }
+  if (axis !== 'x') return
+
+  movedX = Math.max(movedX, Math.abs(dx))
+  // 只允许往左拖（收起方向）
+  dragOffset.value = Math.min(0, dx)
+}
+
+function onDragEnd(): void {
+  if (!dragging.value) return
+  dragging.value = false
+
+  const offset = dragOffset.value
+  const elapsed = Math.max(1, performance.now() - startedAt)
+  // 速度按「向左为正」算，快速甩一下也能关闭
+  const velocity = -offset / elapsed
+  const width = asideRef.value?.offsetWidth ?? 320
+  dragOffset.value = 0
+
+  const shouldClose = -offset > Math.min(width * 0.3, 72) || velocity > 0.45
+  if (shouldClose) emit('close')
+}
+
+/** 拖拽结束时浏览器还会补一次 click，这里拦掉，避免误触侧栏里的按钮 */
+function onClickCapture(event: MouseEvent): void {
+  if (movedX > 8) {
+    event.stopPropagation()
+    event.preventDefault()
+    movedX = 0
+  }
+}
 
 const roleIcons: Record<string, unknown> = {
   inbox: Inbox,
@@ -96,17 +179,26 @@ async function go(path: string): Promise<void> {
   <!--
     宽度与文字同步过渡：文字用更短的时长淡出/淡入（100ms），
     到宽度动画结束时文字早已消失，不会出现被挤压的中间态。
-    响应式下抽屉从左侧滑入/滑出（300ms），宽度放宽到 320px（窄屏按 86vw 收窄）。
+    响应式下抽屉从左侧滑入/滑出（300ms），宽度放宽到 320px（窄屏按 86vw 收窄）；
+    手指拖动时临时关掉过渡直接跟手，松手后再恢复过渡做收尾动画。
 
     注意：Tailwind v4 的 translate-* 生成的是 `translate` 属性而不是 `transform`，
     过渡属性里必须带上 translate，否则抽屉是「瞬移」而不是滑动。
   -->
   <aside
-    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep transition-[width,transform,translate] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[min(320px,86vw)] max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
+    ref="asideRef"
+    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep transition-[width,transform,translate] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[min(320px,86vw)] max-lg:touch-pan-y max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
     :class="[
       collapsed ? 'w-[80px]' : 'w-[264px]',
       open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',
+      dragging ? 'max-lg:transition-none' : '',
     ]"
+    :style="dragging ? { translate: `${dragOffset}px 0` } : undefined"
+    @pointerdown="onDragStart"
+    @pointermove="onDragMove"
+    @pointerup="onDragEnd"
+    @pointercancel="onDragEnd"
+    @click.capture="onClickCapture"
   >
     <!--
       响应式下顶栏不再显示品牌图标，图标挪到抽屉的第一行（只留标记，不放文字）；

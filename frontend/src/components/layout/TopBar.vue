@@ -7,6 +7,7 @@ import { useMailStore } from '../../stores/mail'
 import { usePageChrome } from '../../composables/usePageChrome'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useSidebar } from '../../composables/useSidebar'
+import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
 
 withDefaults(
   defineProps<{ searchable?: boolean; showSidebarToggle?: boolean; sidebarCollapsed?: boolean }>(),
@@ -20,9 +21,17 @@ const router = useRouter()
 const { secondary, title: pageTitle } = usePageChrome()
 
 /** 响应式顶栏的「更多」菜单：用列表筛选替代被隐藏的第二行 */
-const { count: selectedCount, clear: clearSelection, markRead: markSelectedRead, removeSelected } =
-  useMailSelection()
+const {
+  count: selectedCount,
+  checkedAll,
+  toggleAll,
+  clear: clearSelection,
+  markRead: markSelectedRead,
+  removeSelected,
+} = useMailSelection()
 const { isDesktop } = useSidebar()
+/** 响应式顶栏随列表下滑收起、上滑原地恢复 */
+const { hidden: topBarHidden, show: showTopBar } = useTopBarAutoHide()
 
 /** 响应式多选态：桌面端列表自带批量条，这里只在窄屏接管顶栏 */
 const selecting = computed(() => !isDesktop.value && selectedCount.value > 0)
@@ -59,6 +68,8 @@ watch(selecting, (active) => {
   if (!active) return
   filterMenu.value = false
   searchOpen.value = false
+  // 批量操作都在顶栏，先把可能收起的顶栏拉回来
+  showTopBar()
 })
 
 const searchRef = ref<HTMLInputElement | null>(null)
@@ -151,8 +162,13 @@ onBeforeUnmount(() => {
     响应式（< lg）：顶栏透明、绝对定位悬浮，宽高包含刘海安全区，内容从它下方穿过；
     品牌图标交给侧栏第一行显示（见 SideBar），这里只留菜单与搜索，自然贴到最左侧。
   -->
+  <!--
+    响应式下还会随列表滚动收起/恢复：下滑整体上移出屏幕，上滑原地滑回，
+    位移只走 transform，不会引起重排，动画是平滑的。
+  -->
   <header
-    class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4 max-lg:absolute max-lg:inset-x-0 max-lg:top-0 max-lg:h-[var(--topbar-safe)] max-lg:gap-3 max-lg:bg-transparent max-lg:px-4 max-lg:pt-[env(safe-area-inset-top,0px)]"
+    class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4 max-lg:absolute max-lg:inset-x-0 max-lg:top-0 max-lg:h-[var(--topbar-safe)] max-lg:gap-3 max-lg:bg-transparent max-lg:px-4 max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:transition-transform max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
+    :class="topBarHidden ? 'max-lg:-translate-y-full' : 'max-lg:translate-y-0'"
   >
     <!-- 响应式顶栏遮罩：顶部完全不透明、向下渐隐到几乎透明（强度与模糊见 .topbar-veil） -->
     <div class="topbar-veil max-lg:block" aria-hidden="true" />
@@ -211,6 +227,16 @@ onBeforeUnmount(() => {
       <span v-if="selecting" class="min-w-0 truncate text-[14.5px] font-medium text-ink">
         已选 {{ selectedCount }} 封
       </span>
+      <!-- 全选 / 取消全选：颜色与旁边按钮一致，高度也对齐到 44px -->
+      <button
+        v-if="selecting"
+        type="button"
+        class="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-2 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink active:scale-95"
+        :aria-label="checkedAll ? '取消全选' : '全选'"
+        @click="toggleAll"
+      >
+        {{ checkedAll ? '取消全选' : '全选' }}
+      </button>
       <div v-if="selecting" class="ml-auto flex shrink-0 items-center gap-1">
         <button
           type="button"

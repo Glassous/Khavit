@@ -83,15 +83,15 @@ const recipients = computed(() => {
 
 <template>
   <!--
-    桌面端是列表行；响应式下每条邮件各自成岛（圆角 + 边框 + 间距），
-    选中时底色换成品牌浅色、圆角明显放大，和未选中拉开差距。
+    桌面端是列表行；响应式下每条邮件各自成岛（圆角 + 边框 + 间距）。
+    选中时换成品牌浅底、去掉描边、圆角收小，和未选中拉开差距。
     底色/边框色都写在状态分支里——基础类里的 max-lg: 变体优先级更高，会盖掉状态色。
   -->
   <div
     class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:mb-px max-lg:border max-lg:border-solid max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]"
     :class="[
       active || selected
-        ? 'bg-brand-ghost max-lg:rounded-[26px] max-lg:border-brand/40'
+        ? 'bg-brand-ghost max-lg:rounded-[20px] max-lg:border-transparent'
         : 'hover:bg-surface-2/70 max-lg:rounded-[14px] max-lg:border-line max-lg:bg-surface',
       unread ? 'is-unread' : '',
       compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',

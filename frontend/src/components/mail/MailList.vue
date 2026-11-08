@@ -10,6 +10,7 @@ import AppSkeleton from '../ui/AppSkeleton.vue'
 import AppEmpty from '../ui/AppEmpty.vue'
 import { useDensity } from '../../composables/useDensity'
 import { useMailSelection } from '../../composables/useMailSelection'
+import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
 
 const mail = useMailStore()
 const auth = useAuthStore()
@@ -40,6 +41,9 @@ const {
 /** 有任何选中项时，点击邮件行不再打开邮件，而是切换选中 */
 const selectionMode = computed(() => selectedCount.value > 0)
 
+/** 响应式顶栏：下滑收起、上滑原地恢复 */
+const topBar = useTopBarAutoHide()
+
 const filters = [
   { key: 'all', label: '全部' },
   { key: 'unread', label: '未读' },
@@ -52,8 +56,14 @@ const title = computed(() => {
 })
 
 // 换文件夹或离开邮件页时清空选中，避免"已选 3 封"跟着跑到别的列表
-watch(() => mail.currentMailboxId, () => clearSelection())
-onBeforeUnmount(() => clearSelection())
+watch(() => mail.currentMailboxId, () => {
+  clearSelection()
+  topBar.reset()
+})
+onBeforeUnmount(() => {
+  clearSelection()
+  topBar.reset()
+})
 
 function toggleCheck(id: string, checked: boolean): void {
   setChecked(id, checked)
@@ -69,6 +79,7 @@ async function bulkDelete(): Promise<void> {
 
 async function onScroll(event: Event): Promise<void> {
   const el = event.target as HTMLElement
+  topBar.handleScroll(el.scrollTop)
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
     await mail.loadMore()
   }
