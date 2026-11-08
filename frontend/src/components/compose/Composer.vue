@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import gsap from 'gsap'
-import { Flip } from 'gsap/Flip'
 import {
   CheckCircle2,
   Cloud,
@@ -19,8 +18,6 @@ import { formatBytes } from '../../utils/format'
 import RecipientInput from './RecipientInput.vue'
 import AttachmentPicker from './AttachmentPicker.vue'
 import AppButton from '../ui/AppButton.vue'
-
-gsap.registerPlugin(Flip)
 
 const composer = useComposerStore()
 const bodyRef = ref<HTMLTextAreaElement | null>(null)
@@ -46,7 +43,7 @@ const draftLabel = computed(() => {
  * - 收起：贴底的抽屉，桌面端 840×680（原来只有 600×560），移动端接近整屏；
  * - 最大化：铺满整个可视区，只在与屏幕边缘之间留 16px 的缝，内容跟着一起铺满；
  *   移动端整屏（顶部让出安全区）。
- * 两种形态之间用 Flip 补间，宽高与位置都是连续变化的。
+ * 两种形态之间按切换前后的矩形补间，宽高与位置都是连续变化的。
  */
 const sheetClass = computed(() =>
   composer.expanded
@@ -97,24 +94,117 @@ function onLeave(el: Element, done: () => void): void {
   gsap.to(sheet, { yPercent: 100, opacity: 0, duration: 0.26, ease: 'power2.in', onComplete: done })
 }
 
-/** 收起 ⇄ 最大化：Flip 记录切换前后的矩形，宽度、高度、位置一起补间 */
+/**
+ * 收起 ⇄ 最大化：先量当前位置，切换形态后再量一次，用 fixed 定位把
+ * 宽高与位置一起补间过去。
+ * 不用 Flip 的自动补间：抽屉是贴底布局（flex items-end），补间高度时
+ * 布局每帧都会重新定位，和补间位移叠加后会「先向上弹一下再收缩」。
+ */
 async function toggleExpanded(): Promise<void> {
   const sheet = sheetRef.value
   if (!sheet) return
 
   gsap.killTweensOf(sheet)
-  gsap.set(sheet, { clearProps: 'transform,opacity' })
-  const state = prefersReducedMotion() ? null : Flip.getState(sheet)
+  // 手势/上一次补间可能留下内联样式：先按当前可见位置记下矩形，再全部清掉
+  const before = sheet.getBoundingClientRect()
+  gsap.set(sheet, {
+    clearProps: 'transform,opacity,position,left,top,width,height,maxHeight,margin',
+  })
 
   composer.toggleExpanded()
   await nextTick()
 
-  if (!state) return
-  Flip.from(state, {
+  if (prefersReducedMotion()) return
+  const after = sheet.getBoundingClientRect()
+
+  gsap.set(sheet, {
+    position: 'fixed',
+    left: before.left,
+    top: before.top,
+    width: before.width,
+    height: before.height,
+    // 收起态带 max-height 上限，会把起始高度截断出底部空隙，补间期间先放开
+    maxHeight: 'none',
+    margin: 0,
+  })
+  gsap.to(sheet, {
+    left: after.left,
+    top: after.top,
+    width: after.width,
+    height: after.height,
     duration: 0.42,
     ease: 'power3.inOut',
-    scale: false,
-    onComplete: () => gsap.set(sheet, { clearProps: 'transform,width,height' }),
+    onComplete: () => {
+      gsap.set(sheet, { clearProps: 'position,left,top,width,height,maxHeight,margin,transform' })
+    },
+  })
+}
+
+/* ------------------------------ 把手下拉 ------------------------------ */
+
+/**
+ * 把手是真正的拖拽区：向下跟手、向上带阻尼，松手后按位移
+ * 关闭 / 最大化 / 回弹，位置与动画都不经过 CSS 过渡。
+ */
+let handleDragging = false
+let handleStartY = 0
+let handleDelta = 0
+
+function onHandlePointerDown(event: PointerEvent): void {
+  const sheet = sheetRef.value
+  if (!sheet || composer.expanded) return
+  handleDragging = true
+  handleStartY = event.clientY
+  handleDelta = 0
+  gsap.killTweensOf(sheet)
+  try {
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  } catch {
+    /* 合成事件或个别浏览器不支持捕获，退化成普通监听即可 */
+  }
+}
+
+function onHandlePointerMove(event: PointerEvent): void {
+  if (!handleDragging || !sheetRef.value) return
+  const dy = event.clientY - handleStartY
+  handleDelta = dy
+  // 向下完全跟手；向上给阻尼，只让抽屉抬起一点点，避免整块离开底边
+  const offset = dy >= 0 ? dy : Math.max(dy * 0.4, -64)
+  gsap.set(sheetRef.value, {
+    y: offset,
+    opacity: dy > 0 ? Math.max(0.55, 1 - dy / 900) : 1,
+  })
+}
+
+function onHandlePointerEnd(): void {
+  if (!handleDragging) return
+  handleDragging = false
+  const sheet = sheetRef.value
+  if (!sheet) return
+
+  const dy = handleDelta
+  const height = sheet.offsetHeight || 600
+  handleDelta = 0
+
+  // 向下拉过一小段高度就关闭：保持当前位移，离场动画会从这里继续滑下去
+  if (dy > Math.min(height * 0.24, 140)) {
+    composer.close()
+    return
+  }
+
+  // 向上拉够一段：直接从当前抬起的姿态展开成最大化
+  if (dy < -72) {
+    void toggleExpanded()
+    return
+  }
+
+  // 没到阈值：回弹
+  gsap.to(sheet, {
+    y: 0,
+    opacity: 1,
+    duration: 0.3,
+    ease: 'power3.out',
+    onComplete: () => gsap.set(sheet, { clearProps: 'transform,opacity' }),
   })
 }
 
@@ -159,18 +249,28 @@ function onPick(files: FileList): void {
       >
         <div
           ref="sheetRef"
-          class="pointer-events-auto relative flex w-full flex-col overflow-hidden border border-line bg-surface shadow-[0_-20px_64px_-28px_rgb(15_21_32/0.4)] max-lg:pb-[var(--app-safe-bottom)] max-lg:pl-[var(--app-safe-left)] max-lg:pr-[var(--app-safe-right)]"
+          class="pointer-events-auto relative flex w-full flex-col overflow-hidden border border-line bg-surface shadow-[0_-20px_64px_-28px_rgb(15_21_32/0.4)] max-lg:pl-[var(--app-safe-left)] max-lg:pr-[var(--app-safe-right)]"
           :class="sheetClass"
           role="dialog"
           aria-modal="false"
           aria-label="撰写邮件"
         >
-          <!-- 底部抽屉的抓手，最大化后不再需要 -->
-          <span
+          <!--
+            底部抽屉的把手：可上下拖动。向下跟手、松手过阈值即关闭；
+            向上带阻尼，拉够一段直接展开成最大化。最大化后隐藏。
+          -->
+          <div
             v-if="!composer.expanded"
-            class="pointer-events-none absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line-strong"
-            aria-hidden="true"
-          />
+            class="absolute left-1/2 top-0 z-10 flex h-7 w-24 -translate-x-1/2 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+            role="button"
+            aria-label="拖动调整撰写窗口"
+            @pointerdown="onHandlePointerDown"
+            @pointermove="onHandlePointerMove"
+            @pointerup="onHandlePointerEnd"
+            @pointercancel="onHandlePointerEnd"
+          >
+            <span class="pointer-events-none h-1 w-9 rounded-full bg-line-strong" aria-hidden="true" />
+          </div>
 
           <header class="shrink-0">
             <div class="flex h-[54px] w-full items-center gap-1.5 px-4 sm:px-5">
@@ -272,7 +372,8 @@ function onPick(files: FileList): void {
             </div>
           </div>
 
-          <footer class="shrink-0 border-t border-line bg-surface-2/40">
+          <!-- 底栏自己吃掉安全区：背景一直铺到屏幕底边，按钮仍在安全区之上 -->
+          <footer class="shrink-0 border-t border-line bg-surface-2/40 max-lg:pb-[var(--app-safe-bottom)]">
             <div class="flex h-16 w-full items-center gap-2 px-4 sm:px-5">
               <AttachmentPicker :uploading="composer.uploading" @pick="onPick" @drop="onPick" />
 
