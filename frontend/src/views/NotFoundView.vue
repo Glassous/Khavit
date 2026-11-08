@@ -4,7 +4,7 @@ import AppButton from '../components/ui/AppButton.vue'
 </script>
 
 <template>
-  <div class="flex min-h-full items-center justify-center bg-canvas px-6">
+  <div class="flex min-h-full items-center justify-center bg-canvas pl-[calc(1.5rem+var(--app-safe-left))] pr-[calc(1.5rem+var(--app-safe-right))] pt-[calc(2rem+var(--app-safe-top))] pb-[calc(2rem+var(--app-safe-bottom))]">
     <div class="max-w-[420px] text-center">
       <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-surface text-ink-4">
         <Compass class="h-6 w-6" />

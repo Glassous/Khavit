@@ -73,11 +73,22 @@
 
 @layer base {
   :root {
-    /* 移动端顶栏悬浮在内容之上（透明、可穿透）：
-       页面据此让出顶部安全距离 = 顶栏高度 + 刘海/状态栏安全区。
-       响应式顶栏比桌面端更高（64px），内部控件也更大，手指更好点。 */
+    /*
+      移动端顶栏悬浮在内容之上（透明、可穿透）：
+      页面据此让出顶部安全距离 = 顶栏高度 + 刘海/状态栏安全区。
+      响应式顶栏比桌面端更高（64px），内部控件也更大，手指更好点。
+
+      安全区统一走 --app-safe-*：
+      - 普通浏览器回退到 env(safe-area-inset-*)（iOS 刘海、横屏圆角等）；
+      - Android WebView 壳会注入 --android-safe-*（状态栏/导航栏/挖孔的真实高度），
+        注入只发生在壳内，普通浏览器永远拿不到这些变量。
+    */
     --topbar-h: 4rem;
-    --topbar-safe: calc(4rem + env(safe-area-inset-top, 0px));
+    --app-safe-top: var(--android-safe-top, env(safe-area-inset-top, 0px));
+    --app-safe-bottom: var(--android-safe-bottom, env(safe-area-inset-bottom, 0px));
+    --app-safe-left: var(--android-safe-left, env(safe-area-inset-left, 0px));
+    --app-safe-right: var(--android-safe-right, env(safe-area-inset-right, 0px));
+    --topbar-safe: calc(var(--topbar-h) + var(--app-safe-top));
   }
 
   html,

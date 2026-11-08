@@ -32,3 +32,22 @@ Thumbs.db
 
 # 生成的契约文档片段
 docs/.jmap-raw/
+
+# Android 工程：缓存、构建产物、本地 SDK 路径与签名文件都不入库
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/local.properties
+android/**/build/
+android/app/release/
+android/releases/
+android/captures/
+android/.cxx/
+android/.externalNativeBuild/
+*.apk
+*.aab
+*.ap_
+*.hprof
+*.jks
+*.keystore
+keystore.properties

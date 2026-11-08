@@ -51,7 +51,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       左右留白与底部间距也与列表一致，卡片自己浮在外壳底色上。
     -->
     <div
-      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:px-2 max-lg:pb-3 max-lg:pt-[var(--topbar-safe)]"
+      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pl-[calc(0.5rem+var(--app-safe-left))] max-lg:pr-[calc(0.5rem+var(--app-safe-right))] max-lg:pb-[calc(0.75rem+var(--app-safe-bottom))] max-lg:pt-[var(--topbar-safe)]"
     >
       <slot />
     </div>

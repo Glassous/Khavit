@@ -54,7 +54,10 @@ onBeforeUnmount(() => {
       leave-active-class="transition duration-150"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        v-if="open"
+        class="fixed inset-0 z-50 flex items-center justify-center pl-[calc(1rem+var(--app-safe-left))] pr-[calc(1rem+var(--app-safe-right))] pt-[calc(1rem+var(--app-safe-top))] pb-[calc(1rem+var(--app-safe-bottom))]"
+      >
         <div
           class="absolute inset-0 bg-ink/35 backdrop-blur-[2px] dark:bg-black/60"
           @click="closeOnBackdrop && close()"

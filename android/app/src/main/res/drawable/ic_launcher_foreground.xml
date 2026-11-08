@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!--
+      与前端 BrandMark 的「Kv」标记同一套路径：
+      原 viewBox 24×24，按 2.0 倍缩放并居中到 108×108，
+      四周留出足够的安全留白，避免 adaptive icon 裁剪后图案顶到边缘。
+      K 用不透明白色，v 用 68% 透明度做出前后层次（与原 logo 一致）。
+    -->
+    <!-- K -->
+    <path
+        android:pathData="M37,38.8v30.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M54.6,38.8L37.4,54.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M40.2,50.8L55,69.2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- v：同色更低不透明度 -->
+    <path
+        android:pathData="M57.8,52L64.4,69.2L71,52"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeAlpha="0.68"
+        android:strokeWidth="5.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

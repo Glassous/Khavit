@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与前端深色画布一致 -->
+    <color name="canvas">#FF0E1116</color>
+</resources>

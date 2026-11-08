@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
       <div v-if="open" class="fixed inset-0 z-50">
         <div class="absolute inset-0 bg-ink/30 backdrop-blur-[2px] dark:bg-black/60" @click="close" />
         <aside
-          class="animate-slide-in absolute inset-y-0 right-0 flex w-full flex-col border-l border-line bg-surface shadow-[-24px_0_80px_-40px_rgb(15_21_32/0.5)]"
+          class="animate-slide-in absolute inset-y-0 right-0 flex w-full flex-col border-l border-line bg-surface pl-[var(--app-safe-left)] pr-[var(--app-safe-right)] pt-[var(--app-safe-top)] pb-[var(--app-safe-bottom)] shadow-[-24px_0_80px_-40px_rgb(15_21_32/0.5)]"
           :style="{ maxWidth: width }"
           role="dialog"
           aria-modal="true"

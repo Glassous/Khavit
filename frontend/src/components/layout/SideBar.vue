@@ -207,7 +207,7 @@ async function openPanel(next: IslandPanel): Promise<void> {
   -->
   <aside
     ref="asideRef"
-    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep transition-[width,transform,translate] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[min(320px,86vw)] max-lg:touch-pan-y max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
+    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep pl-[var(--app-safe-left)] pr-[var(--app-safe-right)] pt-[var(--app-safe-top)] pb-[var(--app-safe-bottom)] transition-[width,transform,translate] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[min(320px,86vw)] max-lg:touch-pan-y max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
     :class="[
       collapsed ? 'w-[80px]' : 'w-[264px]',
       open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',

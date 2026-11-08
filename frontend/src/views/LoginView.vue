@@ -59,7 +59,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-full items-center justify-center bg-canvas px-5 py-12">
+  <div class="flex min-h-full items-center justify-center bg-canvas pl-[calc(1.25rem+var(--app-safe-left))] pr-[calc(1.25rem+var(--app-safe-right))] pt-[calc(3rem+var(--app-safe-top))] pb-[calc(3rem+var(--app-safe-bottom))]">
     <div class="w-full max-w-[380px]">
       <div class="mb-9 flex items-center gap-2.5">
         <BrandMark class="h-6 w-6 shrink-0 text-brand" />

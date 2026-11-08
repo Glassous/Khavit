@@ -208,10 +208,13 @@ onBeforeUnmount(() => {
     位移只走 transform，不会引起重排，动画是平滑的。
   -->
   <header
-    class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4 max-lg:absolute max-lg:inset-x-0 max-lg:top-0 max-lg:h-[var(--topbar-safe)] max-lg:gap-3 max-lg:bg-transparent max-lg:px-4 max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:transition-transform max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
+    class="relative z-30 flex h-[calc(3.5rem+var(--app-safe-top))] shrink-0 items-center gap-3 bg-canvas-deep px-3 pt-[var(--app-safe-top)] sm:px-4 max-lg:absolute max-lg:inset-x-0 max-lg:top-0 max-lg:h-[var(--topbar-safe)] max-lg:gap-3 max-lg:bg-transparent max-lg:pl-[calc(1rem+var(--app-safe-left))] max-lg:pr-[calc(1rem+var(--app-safe-right))] max-lg:pt-[var(--app-safe-top)] max-lg:transition-transform max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
     :class="topBarHidden ? 'max-lg:-translate-y-full' : 'max-lg:translate-y-0'"
   >
-    <!-- 响应式顶栏遮罩：顶部完全不透明、向下渐隐到几乎透明（强度与模糊见 .topbar-veil） -->
+    <!--
+      响应式顶栏遮罩：inset-0 铺满整条顶栏（含状态栏/挖孔安全区），
+      底色、渐变与 backdrop-filter 共用同一个高度，Android 上状态栏区域与下方工具栏是连续的一整块。
+    -->
     <div class="topbar-veil max-lg:block" aria-hidden="true" />
     <!-- 最左侧：品牌标记（纯图标）；响应式下隐藏，位置让给侧栏内的第一行 -->
     <!-- 面板打开时用 replace 回邮件页：避免历史里留下一条可回退的面板记录 -->

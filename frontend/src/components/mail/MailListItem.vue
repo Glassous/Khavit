@@ -176,7 +176,7 @@ const attachments = computed(() => props.bodyEmail?.attachments ?? props.email.a
  */
 const layerClass = computed(() => {
   if (props.expanded) {
-    return 'fixed inset-0 z-20 overflow-y-auto scroll-slim px-2 pb-28 pt-[calc(var(--topbar-safe)+4px)]'
+    return 'fixed inset-0 z-20 overflow-y-auto scroll-slim pl-[calc(0.5rem+var(--app-safe-left))] pr-[calc(0.5rem+var(--app-safe-right))] pb-[calc(7rem+var(--app-safe-bottom))] pt-[calc(var(--topbar-safe)+4px)]'
   }
   return props.dimmed ? 'invisible' : ''
 })

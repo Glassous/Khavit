@@ -21,7 +21,7 @@ const tones: Record<ToastTone, string> = {
 
 <template>
   <Teleport to="body">
-    <div class="pointer-events-none fixed bottom-5 right-5 z-[60] flex w-[330px] flex-col gap-2">
+    <div class="pointer-events-none fixed bottom-[calc(1.25rem+var(--app-safe-bottom))] right-[calc(1.25rem+var(--app-safe-right))] z-[60] flex w-[330px] flex-col gap-2">
       <TransitionGroup
         enter-active-class="transition duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         enter-from-class="opacity-0 translate-y-2"

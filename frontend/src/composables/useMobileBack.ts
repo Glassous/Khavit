@@ -13,6 +13,7 @@ import { nextTick, onScopeDispose, watch, type WatchSource } from 'vue'
  * 多个浮层按打开顺序入栈，返回键永远只关最上面那层：确认框 → 写信 → 正文 → 抽屉…
  */
 
+/** 历史记录标记：Android 壳的返回键策略会读取这个字段，改名需要同步 MainActivity */
 const STATE_KEY = '__khavitBackLayer'
 const MOBILE_QUERY = '(max-width: 1023.98px)'
 /** 守卫回退的兜底时长：个别 WebView 可能吞掉 popstate */

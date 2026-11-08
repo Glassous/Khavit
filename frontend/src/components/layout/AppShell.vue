@@ -38,7 +38,7 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
         邮件页在下面保持挂载，关掉面板就是原来的列表，不会重新加载。
       -->
       <div
-        class="relative m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent"
+        class="relative m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent lg:mb-[calc(0.5rem+var(--app-safe-bottom))] lg:mr-[calc(0.5rem+var(--app-safe-right))]"
       >
         <slot />
         <slot name="panel" />

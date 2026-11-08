@@ -65,10 +65,10 @@ function onPick(files: FileList): void {
     >
       <div
         v-if="composer.visible"
-        class="fixed z-50 flex flex-col overflow-hidden border border-line bg-surface shadow-[0_32px_96px_-32px_rgb(15_21_32/0.55)]"
+        class="fixed z-50 flex flex-col overflow-hidden border border-line bg-surface pb-[var(--app-safe-bottom)] shadow-[0_32px_96px_-32px_rgb(15_21_32/0.55)] max-lg:pl-[var(--app-safe-left)] max-lg:pr-[var(--app-safe-right)]"
         :class="
           composer.expanded
-            ? 'inset-3 rounded-2xl sm:inset-6'
+            ? 'inset-3 rounded-2xl max-lg:pt-[var(--app-safe-top)] sm:inset-6'
             : 'bottom-0 right-0 h-[560px] w-full rounded-t-2xl sm:bottom-4 sm:right-6 sm:w-[600px] sm:rounded-2xl'
         "
         role="dialog"

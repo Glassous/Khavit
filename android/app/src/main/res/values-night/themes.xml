@@ -1,0 +1,21 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 纯框架主题：不依赖 AppCompat / Material -->
+    <style name="Theme.Khavit" parent="android:Theme.Material.NoActionBar">
+        <!-- 深色主题下画布与启动底色 -->
+        <item name="android:windowBackground">@color/canvas</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">@color/canvas</item>
+
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="q">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
+
+        <!-- 深色主题下系统栏图标用浅色 -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
+
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

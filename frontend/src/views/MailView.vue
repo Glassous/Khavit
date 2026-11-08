@@ -171,7 +171,7 @@ useHotkeys([
     -->
     <div
       v-if="readingOnMobile"
-      class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex gap-2 px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden"
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex gap-2 pl-[calc(0.75rem+var(--app-safe-left))] pr-[calc(0.75rem+var(--app-safe-right))] pb-[max(12px,var(--app-safe-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden"
       :class="topBarHidden ? 'translate-y-[calc(100%+16px)]' : 'translate-y-0'"
     >
       <button

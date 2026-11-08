@@ -119,7 +119,7 @@ async function refresh(): Promise<void> {
     <!-- 列表：桌面端吸顶表头 + 独立滚动；响应式下整页只有这一个滚动容器 -->
     <div
       ref="listRef"
-      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:px-2 max-lg:pb-3 max-lg:pt-[var(--topbar-safe)]"
+      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pl-[calc(0.5rem+var(--app-safe-left))] max-lg:pr-[calc(0.5rem+var(--app-safe-right))] max-lg:pb-[calc(0.75rem+var(--app-safe-bottom))] max-lg:pt-[var(--topbar-safe)]"
       :style="expanded ? { overflow: 'hidden' } : undefined"
       @scroll="onScroll"
     >

@@ -1,0 +1,5 @@
+# WebView 通过 JavaScript 接口回调原生，方法名不能被 R8 混淆
+-keepattributes RuntimeVisibleAnnotations
+-keepclassmembers class com.glassous.khavit.MainActivity$ShellBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
