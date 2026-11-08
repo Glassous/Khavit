@@ -20,7 +20,10 @@ import { useTheme } from '../../composables/useTheme'
 import { useConfirm } from '../../composables/useConfirm'
 import { initialOf, avatarColor } from '../../utils/format'
 
-withDefaults(defineProps<{ searchable?: boolean }>(), { searchable: true })
+withDefaults(
+  defineProps<{ searchable?: boolean; showSidebarToggle?: boolean; sidebarCollapsed?: boolean }>(),
+  { searchable: true, showSidebarToggle: false, sidebarCollapsed: false },
+)
 const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 
 const auth = useAuthStore()
@@ -102,13 +105,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
   <header
     class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4"
   >
+    <!-- 最左侧：侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
     <button
+      v-if="showSidebarToggle"
       type="button"
-      class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink lg:hidden"
+      class="-ml-1 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
       @click="emit('toggle-sidebar')"
     >
-      <Menu class="h-4.5 w-4.5" />
+      <Menu class="h-6 w-6" :stroke-width="2.1" />
+    </button>
+    <button
+      v-if="showSidebarToggle"
+      type="button"
+      class="-ml-1 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
+      :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+      :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+      @click="emit('toggle-sidebar')"
+    >
+      <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
     </button>
 
     <RouterLink to="/mail" class="flex shrink-0 items-center gap-2.5 rounded-lg pr-1">

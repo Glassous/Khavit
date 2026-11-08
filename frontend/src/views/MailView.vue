@@ -12,6 +12,7 @@ import { useComposerStore } from '../stores/composer'
 import { useHotkeys } from '../composables/useHotkeys'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
+import { useSidebar } from '../composables/useSidebar'
 import type { Mailbox } from '../jmap/types'
 
 const auth = useAuthStore()
@@ -22,8 +23,17 @@ const router = useRouter()
 const toast = useToast()
 const { confirm } = useConfirm()
 
+const { collapsed: sidebarCollapsed, isDesktop, toggle: toggleSidebar } = useSidebar()
 const sidebarOpen = ref(false)
 const mobileReader = ref(false)
+
+/** 折叠成图标窄栏只在桌面端生效，移动端抽屉始终是完整侧栏 */
+const sidebarRail = computed(() => sidebarCollapsed.value && isDesktop.value)
+
+function onToggleSidebar(): void {
+  if (isDesktop.value) toggleSidebar()
+  else sidebarOpen.value = !sidebarOpen.value
+}
 
 const readingOnMobile = computed(() => mobileReader.value && Boolean(mail.selectedId))
 
@@ -142,9 +152,9 @@ useHotkeys([
 </script>
 
 <template>
-  <AppShell @toggle-sidebar="sidebarOpen = !sidebarOpen">
+  <AppShell :sidebar-collapsed="sidebarRail" @toggle-sidebar="onToggleSidebar">
     <template #sidebar>
-      <SideBar :open="sidebarOpen" @close="sidebarOpen = false" />
+      <SideBar :open="sidebarOpen" :collapsed="sidebarRail" @close="sidebarOpen = false" />
     </template>
 
     <main class="flex min-w-0 flex-1">
