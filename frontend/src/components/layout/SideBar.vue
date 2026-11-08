@@ -73,10 +73,10 @@ function onDragMove(event: PointerEvent): void {
   const dx = event.clientX - startX
   const dy = event.clientY - startY
 
-  // 先判定主轴：竖向手势直接放弃，让页面正常滚动
+  // 先判定主轴：横向意图优先（斜着划也能拖起来），只有明显竖向时才放弃、交还页面滚动
   if (axis === 'none') {
-    if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return
-    axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+    if (Math.abs(dx) < AXIS_LOCK) return
+    axis = Math.abs(dx) >= Math.abs(dy) * 0.6 ? 'x' : 'y'
     if (axis === 'y') {
       dragging.value = false
       dragOffset.value = 0
@@ -101,7 +101,8 @@ function onDragEnd(): void {
   const width = asideRef.value?.offsetWidth ?? 320
   dragOffset.value = 0
 
-  const shouldClose = -offset > Math.min(width * 0.3, 72) || velocity > 0.45
+  // 阈值放低一点：轻扫一下就够关，不必拖满半个抽屉
+  const shouldClose = -offset > Math.min(width * 0.22, 48) || velocity > 0.3
   if (shouldClose) emit('close')
 }
 
@@ -241,7 +242,11 @@ async function go(path: string): Promise<void> {
       </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-3 py-2 scroll-slim" aria-label="邮箱文件夹">
+    <!--
+      touch-pan-y 必须也加在滚动容器上：浏览器计算 touch-action 时只向上找「最近的滚动祖先」，
+      抽屉本身不在链上，所以只给 aside 写是不够的，横向拖动会被当成页面平移而触发 pointercancel。
+    -->
+    <nav class="flex-1 overflow-y-auto px-3 py-2 scroll-slim max-lg:touch-pan-y" aria-label="邮箱文件夹">
       <button
         v-for="box in boxes"
         :key="box.id"
