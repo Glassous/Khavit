@@ -12,6 +12,7 @@ import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
 import { useMailSelection } from '../composables/useMailSelection'
 import { useSidebar } from '../composables/useSidebar'
+import { useIslandPanel } from '../composables/useIslandPanel'
 import type { Mailbox } from '../jmap/types'
 
 const auth = useAuthStore()
@@ -23,6 +24,13 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const { count: selectedCount } = useMailSelection()
 const { isDesktop } = useSidebar()
+const { open: panelOpen } = useIslandPanel()
+
+/**
+ * 设置/管理后台盖在邮件页之上时，邮件页的快捷键全部让位：
+ * Esc 归面板关闭，c/j/k/r 不该在被挡住的时候还生效。
+ */
+const hotkeysActive = (): boolean => !panelOpen.value
 
 const mobileReader = ref(false)
 
@@ -55,7 +63,14 @@ onMounted(async () => {
   await syncFromRoute()
   if (!route.params.mailbox) {
     const inbox = auth.mailboxes.find((item) => item.role === 'inbox')
-    if (inbox) await router.replace(`/mail/${inbox.role ?? inbox.id}`)
+    // 带上查询串：从 ?panel=… 进来时补全文件夹不能把面板丢掉
+    if (inbox) {
+      await router.replace({
+        name: 'mail',
+        params: { mailbox: inbox.role ?? inbox.id },
+        query: route.query,
+      })
+    }
   }
 })
 
@@ -115,23 +130,23 @@ async function markUnread(): Promise<void> {
 }
 
 useHotkeys([
-  { key: 'c', handler: () => composer.openNew() },
+  { key: 'c', handler: () => composer.openNew(), when: hotkeysActive },
   {
     key: 'j',
     handler: () => mail.moveSelection(1),
-    when: () => Boolean(mail.selectedId),
+    when: () => hotkeysActive() && Boolean(mail.selectedId),
   },
   {
     key: 'k',
     handler: () => mail.moveSelection(-1),
-    when: () => Boolean(mail.selectedId),
+    when: () => hotkeysActive() && Boolean(mail.selectedId),
   },
   {
     key: 'r',
     handler: () => {
       if (mail.selectedEmail) composer.openReply(mail.selectedEmail, false)
     },
-    when: () => Boolean(mail.selectedEmail),
+    when: () => hotkeysActive() && Boolean(mail.selectedEmail),
   },
   {
     key: 'Escape',
@@ -139,6 +154,7 @@ useHotkeys([
       if (mobileReader.value) backToList()
       else mail.closeEmail()
     },
+    when: hotkeysActive,
     allowInInput: true,
   },
 ])

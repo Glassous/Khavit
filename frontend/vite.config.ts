@@ -41,8 +41,13 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // 管理后台懒加载，不拖慢首屏
-            admin: ['./src/views/AdminView.vue', './src/jmap/admin.ts', './src/stores/admin.ts'],
+            // 设置与管理后台是岛内面板，按需加载，不拖慢首屏
+            admin: [
+              './src/components/panel/SettingsPanel.vue',
+              './src/components/panel/AdminPanel.vue',
+              './src/jmap/admin.ts',
+              './src/stores/admin.ts',
+            ],
             vendor: ['vue', 'vue-router', 'pinia'],
           },
         },

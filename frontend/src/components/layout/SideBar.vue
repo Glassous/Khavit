@@ -18,6 +18,8 @@ import { useComposerStore } from '../../stores/composer'
 import { mailboxLabel, roleOrder } from '../../utils/i18n'
 import BrandMark from '../ui/BrandMark.vue'
 import { useSidebar } from '../../composables/useSidebar'
+import { useIslandPanel } from '../../composables/useIslandPanel'
+import type { IslandPanel } from '../../utils/panel'
 import type { Mailbox } from '../../jmap/types'
 
 const props = withDefaults(defineProps<{ open?: boolean; collapsed?: boolean }>(), {
@@ -32,6 +34,7 @@ const composer = useComposerStore()
 const router = useRouter()
 const route = useRoute()
 const { isDesktop } = useSidebar()
+const { panel, toggle: togglePanel } = useIslandPanel()
 
 /* ---------------------------------- 手势 ---------------------------------- */
 
@@ -139,7 +142,8 @@ function slugOf(box: Mailbox): string {
 }
 
 function isActive(box: Mailbox): boolean {
-  if (route.name !== 'mail') return false
+  // 面板盖在邮件列表上时，文件夹不再算「当前在看」，避免两处同时高亮
+  if (route.name !== 'mail' || panel.value) return false
   const current = route.params.mailbox as string | undefined
   if (!current) return box.role === 'inbox'
   return current === slugOf(box)
@@ -156,9 +160,10 @@ function compose(): void {
   emit('close')
 }
 
-async function go(path: string): Promise<void> {
-  await router.push(path)
+/** 设置与管理后台是岛内面板：在这里打开/收起，不跳页 */
+async function openPanel(next: IslandPanel): Promise<void> {
   emit('close')
+  await togglePanel(next)
 }
 </script>
 
@@ -305,20 +310,29 @@ async function go(path: string): Promise<void> {
       </button>
     </nav>
 
-    <!-- 底部操作：设置固定在最下方 -->
+    <!--
+      底部操作：设置固定在最下方。
+      两个入口打开的都是「岛内面板」（?panel=…），当前打开的那一项就地高亮。
+    -->
     <div class="px-3 pb-3 pt-1">
       <button
         v-if="auth.admin"
         type="button"
-        class="mb-1 flex w-full cursor-pointer items-center rounded-[10px] text-left text-[15px] text-ink-2 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:bg-surface/70 hover:text-ink"
-        :class="collapsed ? 'gap-0 py-2.5 pl-[14px]' : 'gap-3 py-2.5 pl-2 pr-3'"
+        class="mb-1 flex w-full cursor-pointer items-center rounded-[10px] text-left text-[15px] transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        :class="[
+          collapsed ? 'gap-0 py-2.5 pl-[14px]' : 'gap-3 py-2.5 pl-2 pr-3',
+          panel === 'admin'
+            ? 'bg-surface font-medium text-ink'
+            : 'text-ink-2 hover:bg-surface/70 hover:text-ink',
+        ]"
+        :aria-pressed="panel === 'admin'"
         v-tooltip="collapsed ? '管理后台' : undefined"
-        @click="go('/admin/domains')"
+        @click="openPanel('admin')"
       >
         <span class="flex w-7 shrink-0 items-center justify-center">
           <ShieldCheck
-            class="text-ink-3 transition-[width,height] duration-200"
-            :class="collapsed ? 'h-6 w-6' : 'h-5 w-5'"
+            class="transition-[width,height] duration-200"
+            :class="[collapsed ? 'h-6 w-6' : 'h-5 w-5', panel === 'admin' ? 'text-brand' : 'text-ink-3']"
             :stroke-width="2.1"
           />
         </span>
@@ -336,15 +350,24 @@ async function go(path: string): Promise<void> {
 
       <button
         type="button"
-        class="flex w-full cursor-pointer items-center rounded-[10px] text-left text-[16px] font-medium text-ink-2 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:bg-surface/70 hover:text-ink"
-        :class="collapsed ? 'gap-0 py-3 pl-[14px]' : 'gap-3 py-3 pl-2 pr-3'"
+        class="flex w-full cursor-pointer items-center rounded-[10px] text-left text-[16px] font-medium transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        :class="[
+          collapsed ? 'gap-0 py-3 pl-[14px]' : 'gap-3 py-3 pl-2 pr-3',
+          panel === 'settings'
+            ? 'bg-surface text-ink'
+            : 'text-ink-2 hover:bg-surface/70 hover:text-ink',
+        ]"
+        :aria-pressed="panel === 'settings'"
         v-tooltip="collapsed ? '设置' : undefined"
-        @click="go('/settings')"
+        @click="openPanel('settings')"
       >
         <span class="flex w-7 shrink-0 items-center justify-center">
           <Settings
-            class="text-ink-3 transition-[width,height] duration-200"
-            :class="collapsed ? 'h-[26px] w-[26px]' : 'h-[22px] w-[22px]'"
+            class="transition-[width,height] duration-200"
+            :class="[
+              collapsed ? 'h-[26px] w-[26px]' : 'h-[22px] w-[22px]',
+              panel === 'settings' ? 'text-brand' : 'text-ink-3',
+            ]"
             :stroke-width="2.3"
           />
         </span>

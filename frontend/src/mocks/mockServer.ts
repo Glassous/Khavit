@@ -582,16 +582,13 @@ function normalizeUser(username?: string): string {
 export function session(username?: string): JmapSession {
   const user = normalizeUser(username)
   load(user)
-  // 演示模式：只有默认演示账号具备管理能力，其余账号按普通用户处理，
-  // 这样「非管理员隐藏管理后台入口」的行为在本地也能验证
-  const admin = user === DEFAULT_USER
+  // 演示模式：mock 的意义是把功能看全，所以任何登录账号都按管理员处理：
+  // 侧栏会出现「管理后台」，设置里也会出现「修改密码」区。
   const account = {
     name: user,
     isPersonal: true,
     isReadOnly: false,
-    accountCapabilities: admin
-      ? { [MAIL]: {}, [SUBMISSION]: {}, [STALWART]: {} }
-      : { [MAIL]: {}, [SUBMISSION]: {} },
+    accountCapabilities: { [MAIL]: {}, [SUBMISSION]: {}, [STALWART]: {} },
   }
   return {
     apiUrl: '/jmap/',
@@ -600,9 +597,7 @@ export function session(username?: string): JmapSession {
     eventSourceUrl: '/jmap/eventsource/?types={types}&closeafter={closeafter}&ping={ping}',
     username: user,
     accounts: { [ACCOUNT_ID]: account },
-    primaryAccounts: admin
-      ? { [MAIL]: ACCOUNT_ID, [SUBMISSION]: ACCOUNT_ID, [STALWART]: ACCOUNT_ID }
-      : { [MAIL]: ACCOUNT_ID, [SUBMISSION]: ACCOUNT_ID },
+    primaryAccounts: { [MAIL]: ACCOUNT_ID, [SUBMISSION]: ACCOUNT_ID, [STALWART]: ACCOUNT_ID },
     capabilities: {
       [CORE]: {
         maxSizeUpload: 50_000_000,

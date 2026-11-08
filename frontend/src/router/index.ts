@@ -1,7 +1,7 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { resolveRouteTitle } from '../utils/routeMeta'
-import type { RouteTitleContext } from '../utils/routeMeta'
+import { PANEL_TITLES, legacyPanelLocation, resolvePanel } from '../utils/panel'
 
 /**
  * 路由模式由 VITE_ROUTER_MODE 决定，默认 hash：
@@ -52,9 +52,13 @@ const router = createRouter({
      * 登录后的所有页面共享同一个布局组件：顶栏、侧栏只挂载一次，
      * 页面切换时只有内容区的 RouterView 变化，顶栏不会重建、不会闪。
      * meta 说明：
-     * - secondary：次级页面，顶栏显示返回键 + 标题，不显示品牌 logo
      * - sidebar：需要邮箱侧栏（仅邮件页）
      * - searchable：顶栏显示搜索框（仅邮件页）
+     *
+     * 注意：设置与管理后台不是路由页面，而是邮件页「岛内」的一层面板，
+     * 由查询串控制（?panel=settings / ?panel=admin&section=accounts），
+     * 见 utils/panel.ts 与 composables/useIslandPanel.ts。
+     * 下面两条只是给老地址/老书签留的跳转，浏览器里不会再出现这两个路径。
      */
     {
       path: '/',
@@ -69,21 +73,11 @@ const router = createRouter({
         },
         {
           path: 'settings',
-          name: 'settings',
-          component: () => import('../views/SettingsView.vue'),
-          meta: { title: '设置', secondary: true },
+          redirect: () => legacyPanelLocation('settings'),
         },
         {
           path: 'admin/:section?',
-          name: 'admin',
-          component: () => import('../views/AdminView.vue'),
-          meta: {
-            // 标题跟分区走，顶栏在路由切换的瞬间就能显示正确标题
-            title: (to: RouteTitleContext) =>
-              to.params.section === 'accounts' ? '邮箱账号' : '域名',
-            secondary: true,
-            requiresAdmin: true,
-          },
+          redirect: (to) => legacyPanelLocation('admin', to.params.section as string | undefined),
         },
       ],
     },
@@ -111,7 +105,8 @@ router.beforeEach(async (to) => {
     return { name: 'mail' }
   }
 
-  if (to.meta.requiresAdmin && !auth.admin) {
+  // 管理后台面板只对管理员开放：普通账号带着 ?panel=admin 进来就直接退回邮件页
+  if (resolvePanel(to.query) === 'admin' && !auth.admin) {
     return { name: 'mail' }
   }
 
@@ -121,7 +116,9 @@ router.beforeEach(async (to) => {
 const APP_NAME = 'Khavit邮局'
 
 router.afterEach((to) => {
-  const title = resolveRouteTitle(to)
+  // 打开岛内面板时，标签页标题跟着面板走；面板关掉就回到「邮件」
+  const panel = resolvePanel(to.query)
+  const title = panel ? PANEL_TITLES[panel] : resolveRouteTitle(to)
   document.title = title ? `${title} · ${APP_NAME}` : APP_NAME
 })
 

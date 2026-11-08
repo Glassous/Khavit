@@ -33,11 +33,15 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
       <!--
         主体内容：桌面端是四周留白的圆角岛；响应式下外壳铺满整屏且透明，
         页面各自决定要不要「岛」——邮件列表自带一个贯穿顶栏的浅色岛。
+
+        #panel：设置/管理后台这类「不换页」的视图就地盖在岛内（绝对定位铺满），
+        邮件页在下面保持挂载，关掉面板就是原来的列表，不会重新加载。
       -->
       <div
-        class="m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent"
+        class="relative m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent"
       >
         <slot />
+        <slot name="panel" />
       </div>
     </div>
     <ConfirmDialog />

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
+import { Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
 import { useMailStore } from '../../stores/mail'
-import { usePageChrome } from '../../composables/usePageChrome'
+import { useIslandPanel } from '../../composables/useIslandPanel'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useSidebar } from '../../composables/useSidebar'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
@@ -17,8 +17,8 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 
 const mail = useMailStore()
 const router = useRouter()
-/** 次级页面（设置、管理等）在顶栏显示返回键 + 标题，主页面显示品牌 logo */
-const { secondary, title: pageTitle } = usePageChrome()
+/** 设置/管理后台是岛内面板，不再切换顶栏形态；搜索时先把面板收起来 */
+const { open: panelOpen, hide: closePanel } = useIslandPanel()
 
 /** 响应式顶栏的「更多」菜单：用列表筛选替代被隐藏的第二行 */
 const {
@@ -107,6 +107,8 @@ async function onSearchInput(event: Event): Promise<void> {
     await mail.clearSearch()
     return
   }
+  // 设置/管理后台盖在邮件列表上，开始搜索时先把面板收起来，否则看不到结果
+  if (panelOpen.value) await closePanel()
   if (router.currentRoute.value.name !== 'mail') {
     await router.push('/mail')
   }
@@ -117,16 +119,6 @@ async function clearSearch(): Promise<void> {
   mail.searchText = ''
   searching.value = false
   await mail.clearSearch()
-}
-
-/**
- * 二级页面的返回：优先退回到上一页；直接打开深链接（没有历史记录）时回邮件首页，
- * 而不是把用户留在原地。
- */
-function goBack(): void {
-  const back = window.history.state?.back
-  if (typeof back === 'string' && back) router.back()
-  else void router.replace('/mail')
 }
 
 function onGlobalKey(event: KeyboardEvent): void {
@@ -172,98 +164,78 @@ onBeforeUnmount(() => {
   >
     <!-- 响应式顶栏遮罩：顶部完全不透明、向下渐隐到几乎透明（强度与模糊见 .topbar-veil） -->
     <div class="topbar-veil max-lg:block" aria-hidden="true" />
-    <!--
-      次级页面（设置、管理等）：返回键 + 页面标题，不再占用空间放 logo。
-      主页面：品牌标记 + 侧栏开关。
-    -->
-    <template v-if="secondary">
-      <button
-        type="button"
-        class="-ml-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 max-lg:-ml-2 max-lg:h-11 max-lg:w-11"
-        aria-label="返回"
-        v-tooltip="'返回'"
-        @click="goBack"
-      >
-        <ArrowLeft class="h-[18px] w-[18px] max-lg:h-5 max-lg:w-5" :stroke-width="2.1" />
-      </button>
-      <h1 class="min-w-0 truncate text-[15.5px] font-semibold tracking-tight text-ink max-lg:text-[16.5px]">
-        {{ pageTitle }}
-      </h1>
-    </template>
+    <!-- 主页面：品牌标记 + 侧栏开关（设置、管理后台改用岛内面板，顶栏形态不再变化） -->
+    <!-- 最左侧：品牌标记（纯图标）；响应式下隐藏，位置让给侧栏内的第一行 -->
+    <RouterLink
+      to="/mail"
+      class="ml-1 flex shrink-0 items-center rounded-lg p-1 max-lg:hidden"
+      aria-label="Khavit 邮箱"
+    >
+      <BrandMark class="h-7 w-7 text-brand" />
+    </RouterLink>
 
-    <template v-else>
-      <!-- 最左侧：品牌标记（纯图标）；响应式下隐藏，位置让给侧栏内的第一行 -->
-      <RouterLink
-        to="/mail"
-        class="ml-1 flex shrink-0 items-center rounded-lg p-1 max-lg:hidden"
-        aria-label="Khavit 邮箱"
-      >
-        <BrandMark class="h-7 w-7 text-brand" />
-      </RouterLink>
+    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
+    <button
+      v-if="showSidebarToggle"
+      type="button"
+      class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
+      aria-label="打开菜单"
+      v-tooltip="'打开菜单'"
+      @click="emit('toggle-sidebar')"
+    >
+      <Menu class="h-[22px] w-[22px]" :stroke-width="2.2" />
+    </button>
+    <button
+      v-if="showSidebarToggle"
+      type="button"
+      class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
+      :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+      v-tooltip="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+      @click="emit('toggle-sidebar')"
+    >
+      <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
+    </button>
 
-      <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
+    <!-- 响应式多选态：搜索的位置换成「已选 n 封」，右侧是批量操作 -->
+    <span v-if="selecting" class="min-w-0 truncate text-[14.5px] font-medium text-ink">
+      已选 {{ selectedCount }} 封
+    </span>
+    <!-- 全选 / 取消全选：颜色与旁边按钮一致，高度也对齐到 44px -->
+    <button
+      v-if="selecting"
+      type="button"
+      class="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-2 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink active:scale-95"
+      :aria-label="checkedAll ? '取消全选' : '全选'"
+      @click="toggleAll"
+    >
+      {{ checkedAll ? '取消全选' : '全选' }}
+    </button>
+    <div v-if="selecting" class="ml-auto flex shrink-0 items-center gap-1">
       <button
-        v-if="showSidebarToggle"
         type="button"
-        class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
-        aria-label="打开菜单"
-        v-tooltip="'打开菜单'"
-        @click="emit('toggle-sidebar')"
+        class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="标记为已读"
+        @click="markSelectedRead"
       >
-        <Menu class="h-[22px] w-[22px]" :stroke-width="2.2" />
+        <CheckCheck class="h-[21px] w-[21px]" :stroke-width="2.2" />
       </button>
       <button
-        v-if="showSidebarToggle"
         type="button"
-        class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
-        :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-        v-tooltip="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-        @click="emit('toggle-sidebar')"
+        class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-danger/10 hover:text-danger active:scale-95"
+        aria-label="删除所选"
+        @click="removeSelected"
       >
-        <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
+        <Trash2 class="h-[21px] w-[21px]" :stroke-width="2.2" />
       </button>
-
-      <!-- 响应式多选态：搜索的位置换成「已选 n 封」，右侧是批量操作 -->
-      <span v-if="selecting" class="min-w-0 truncate text-[14.5px] font-medium text-ink">
-        已选 {{ selectedCount }} 封
-      </span>
-      <!-- 全选 / 取消全选：颜色与旁边按钮一致，高度也对齐到 44px -->
       <button
-        v-if="selecting"
         type="button"
-        class="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-2 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink active:scale-95"
-        :aria-label="checkedAll ? '取消全选' : '全选'"
-        @click="toggleAll"
+        class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="取消选择"
+        @click="clearSelection"
       >
-        {{ checkedAll ? '取消全选' : '全选' }}
+        <X class="h-[21px] w-[21px]" :stroke-width="2.2" />
       </button>
-      <div v-if="selecting" class="ml-auto flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
-          aria-label="标记为已读"
-          @click="markSelectedRead"
-        >
-          <CheckCheck class="h-[21px] w-[21px]" :stroke-width="2.2" />
-        </button>
-        <button
-          type="button"
-          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-danger/10 hover:text-danger active:scale-95"
-          aria-label="删除所选"
-          @click="removeSelected"
-        >
-          <Trash2 class="h-[21px] w-[21px]" :stroke-width="2.2" />
-        </button>
-        <button
-          type="button"
-          class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
-          aria-label="取消选择"
-          @click="clearSelection"
-        >
-          <X class="h-[21px] w-[21px]" :stroke-width="2.2" />
-        </button>
-      </div>
-    </template>
+    </div>
 
     <!--
       搜索：收起时是「图标 + 展开快捷键」的小框，点击后向右平滑展开成大框。
