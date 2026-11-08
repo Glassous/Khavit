@@ -103,7 +103,6 @@ export const useComposerStore = defineStore('composer', () => {
     inReplyTo.value = undefined
     references.value = undefined
     autoSaveState.value = 'idle'
-    expanded.value = false
     uploading.value = false
     if (saveTimer) {
       clearTimeout(saveTimer)
@@ -113,6 +112,8 @@ export const useComposerStore = defineStore('composer', () => {
 
   /** 界面显示 + 压入返回键守卫（重复打开同一窗口不会重复压栈） */
   function showComposer(): void {
+    // 上次是在最大化态关掉的：新窗口一律从收起态重新升起，避免尺寸先跳一下
+    if (!visible.value) expanded.value = false
     visible.value = true
     ensureComposerLayer()
   }
@@ -167,12 +168,18 @@ export const useComposerStore = defineStore('composer', () => {
     showComposer()
   }
 
-  /** 关掉写信界面并退掉返回键守卫（关闭按钮、发送成功、手机返回键共用） */
+  /**
+   * 关掉写信界面并退掉返回键守卫（关闭按钮、发送成功、手机返回键共用）。
+   * 这里不清内容、也不还原最大化：退场动画要按关闭前的尺寸原样向下滑走，
+   * 先缩回小窗再滑会看到一次突然的尺寸跳变。内容留到下次打开时由 resetState 清掉。
+   */
   function hideComposer(): void {
     visible.value = false
-    expanded.value = false
     void releaseComposerLayers()
-    resetState()
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
   }
 
   function close(): void {
@@ -205,6 +212,8 @@ export const useComposerStore = defineStore('composer', () => {
   }
 
   function scheduleAutoSave(): void {
+    // 已经关掉的窗口不再保存：异步上传可能在关闭之后才收尾
+    if (!visible.value) return
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       void persistDraft()

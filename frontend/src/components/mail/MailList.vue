@@ -39,14 +39,13 @@ const listRef = ref<HTMLElement | null>(null)
 
 /**
  * 多选与批量操作放在共享的 composable 里：
- * 响应式下由顶栏接管（已选数量 + 按钮），桌面端仍用这里的勾选框与批量条。
+ * 响应式下由顶栏接管（已选数量 + 按钮），桌面端仍用这里的批量条。
  */
 const {
   count: selectedCount,
   checkedAll,
   isSelected,
   toggle,
-  setChecked,
   toggleAll,
   clear: clearSelection,
   markRead: markSelectedRead,
@@ -79,10 +78,6 @@ onBeforeUnmount(() => {
   clearSelection()
   topBar.reset()
 })
-
-function toggleCheck(id: string, checked: boolean): void {
-  setChecked(id, checked)
-}
 
 async function bulkMarkRead(): Promise<void> {
   await markSelectedRead()
@@ -240,7 +235,6 @@ async function refresh(): Promise<void> {
           :key="email.id"
           :email="email"
           :active="mail.selectedId === email.id"
-          :checked="isSelected(email.id)"
           :selected="isSelected(email.id)"
           :selection-mode="selectionMode"
           :compact="compact"
@@ -251,7 +245,6 @@ async function refresh(): Promise<void> {
           @select="(id) => emit('select', id)"
           @toggle-select="toggle"
           @star="(id, starred) => mail.setStarred(id, starred)"
-          @check="toggleCheck"
         />
 
         <div v-if="mail.loadingMore" class="flex items-center justify-center gap-2 py-4 text-[12px] text-ink-3">

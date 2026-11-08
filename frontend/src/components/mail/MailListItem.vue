@@ -18,8 +18,7 @@ const props = withDefaults(
   defineProps<{
     email: Email
     active?: boolean
-    checked?: boolean
-    /** 是否已被选中（响应式下由翻牌的头像表示） */
+    /** 是否已被选中（由翻牌的头像表示） */
     selected?: boolean
     /** 多选态：点击整行改为切换选中，而不是打开邮件 */
     selectionMode?: boolean
@@ -38,7 +37,6 @@ const props = withDefaults(
   }>(),
   {
     active: false,
-    checked: false,
     selected: false,
     selectionMode: false,
     compact: false,
@@ -53,7 +51,6 @@ const emit = defineEmits<{
   select: [id: string]
   'toggle-select': [id: string]
   star: [id: string, starred: boolean]
-  check: [id: string, checked: boolean]
 }>()
 
 /** 展开后这一层就是滚动容器，用它的滚动量驱动顶栏与胶囊收起 */
@@ -88,7 +85,7 @@ function fireLongPress(): void {
 function onPointerDown(event: PointerEvent): void {
   // 展开态是正文页，别再进多选
   if (props.expanded) return
-  // 鼠标有勾选框与头像可点，不需要长按
+  // 鼠标点头像即可选中，不需要长按
   if (event.pointerType === 'mouse') return
   clearPressTimer()
   longPressFired = false
@@ -235,23 +232,6 @@ const islandClass =
       @pointercancel="onPointerCancel"
       @contextmenu="onContextMenu"
     >
-      <!--
-        勾选框只在 hover 时显形，触屏上既看不见也点不准，
-        响应式下直接让出这一列，头像才能贴近左侧边缘。
-      -->
-      <div class="flex shrink-0 items-start max-lg:hidden" :class="compact ? 'pt-0' : 'pt-0.5'">
-        <input
-          v-if="!expanded"
-          type="checkbox"
-          :checked="checked"
-          class="h-3.5 w-3.5 cursor-pointer rounded border-line-strong text-brand accent-brand opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-          :class="checked ? 'opacity-100' : ''"
-          :aria-label="`选择邮件：${subject}`"
-          @click.stop
-          @change="emit('check', email.id, ($event.target as HTMLInputElement).checked)"
-        />
-      </div>
-
       <!--
         头像：点一下即切换选中；选中时绕 Y 轴翻牌到背面（对号）。
         正反两面都是圆，preserve-3d + backface-visibility:hidden 保证同一时刻只看到一面。

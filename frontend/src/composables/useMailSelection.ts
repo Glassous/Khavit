@@ -8,7 +8,7 @@ import { useToast } from './useToast'
  * 邮件多选状态：模块级单例。
  *
  * 列表（点头像 / 长按翻牌选中）与顶栏（已选数量、批量操作按钮）共享同一份状态，
- * 桌面端列表内的勾选框与批量条也复用这里的操作，避免两套删除/已读逻辑。
+ * 桌面端列表内的批量条也复用这里的操作，避免两套删除/已读逻辑。
  */
 const selected = ref<Set<string>>(new Set())
 
@@ -34,13 +34,6 @@ export function useMailSelection() {
     const next = new Set(selected.value)
     if (next.has(id)) next.delete(id)
     else next.add(id)
-    selected.value = next
-  }
-
-  function setChecked(id: string, checked: boolean): void {
-    const next = new Set(selected.value)
-    if (checked) next.add(id)
-    else next.delete(id)
     selected.value = next
   }
 
@@ -90,7 +83,6 @@ export function useMailSelection() {
     checkedAll,
     isSelected,
     toggle,
-    setChecked,
     toggleAll,
     clear,
     markRead,

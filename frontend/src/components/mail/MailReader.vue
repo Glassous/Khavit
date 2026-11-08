@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, CornerUpLeft, Mail, ShieldAlert } from 'lucide-vue-next'
+import { ChevronDown, Mail } from 'lucide-vue-next'
 import type { Email } from '../../jmap/types'
 import { useComposerStore } from '../../stores/composer'
 import { avatarColor, formatAddress, formatBytes, formatFullTime, initialOf } from '../../utils/format'
@@ -85,7 +85,7 @@ const recipients = computed(() => {
         @forward="composer.openForward(email)"
       />
 
-      <div class="min-h-0 flex-1 overflow-y-auto scroll-slim">
+      <div class="min-h-0 flex-1 overflow-y-auto scroll-slim pb-4">
         <!-- 主题与发件人 -->
         <header class="px-4 pb-3 pt-4 sm:px-6">
           <h1 class="text-[19px] font-semibold leading-snug tracking-tight text-ink">
@@ -144,23 +144,6 @@ const recipients = computed(() => {
         </div>
 
         <AttachmentList v-if="email.attachments?.length" :attachments="email.attachments" />
-
-        <!-- 快捷回复 -->
-        <div class="px-4 py-4 sm:px-6">
-          <button
-            type="button"
-            class="flex w-full cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-surface-2/60 px-3 py-2.5 text-left text-[12.5px] text-ink-3 transition-colors hover:border-brand/40 hover:bg-surface"
-            @click="composer.openReply(email, false)"
-          >
-            <CornerUpLeft class="h-3.5 w-3.5" />
-            回复 {{ sender?.name?.trim() || senderEmail }}…
-          </button>
-
-          <p class="mt-3 flex items-center gap-1.5 text-[11px] text-ink-4">
-            <ShieldAlert class="h-3 w-3" />
-            正文在隔离沙箱中渲染，脚本与表单已被移除。
-          </p>
-        </div>
       </div>
     </template>
   </section>
