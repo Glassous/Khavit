@@ -27,7 +27,12 @@ const emit = defineEmits<{
 
 /** 长按选中的计时器：触屏长按 420ms 进入选中 */
 const LONG_PRESS_MS = 420
+/** 手指几乎不可能完全静止，抖动在这个范围内不算「移动」，否则长按永远触发不了 */
+const MOVE_TOLERANCE = 10
+
 let pressTimer: number | undefined
+let startX = 0
+let startY = 0
 /** 本次按压已经触发过长按：松手后那一次 click 必须吞掉，否则会误开详情/误取消选中 */
 let longPressFired = false
 
@@ -38,16 +43,53 @@ function clearPressTimer(): void {
   }
 }
 
+/** 真正进入选中，并记下标记给后面的 click 判断 */
+function fireLongPress(): void {
+  clearPressTimer()
+  longPressFired = true
+  emit('toggle-select', props.email.id)
+  navigator.vibrate?.(12)
+}
+
 function onPointerDown(event: PointerEvent): void {
   // 鼠标有勾选框与头像可点，不需要长按
   if (event.pointerType === 'mouse') return
   clearPressTimer()
   longPressFired = false
-  pressTimer = window.setTimeout(() => {
-    longPressFired = true
-    emit('toggle-select', props.email.id)
-    navigator.vibrate?.(12)
-  }, LONG_PRESS_MS)
+  startX = event.clientX
+  startY = event.clientY
+  pressTimer = window.setTimeout(fireLongPress, LONG_PRESS_MS)
+}
+
+/** 只有真的划走了才取消长按；轻微抖动不打断 */
+function onPointerMove(event: PointerEvent): void {
+  if (pressTimer === undefined) return
+  const dx = event.clientX - startX
+  const dy = event.clientY - startY
+  if (Math.hypot(dx, dy) > MOVE_TOLERANCE) clearPressTimer()
+}
+
+function onPointerEnd(): void {
+  clearPressTimer()
+}
+
+/**
+ * 浏览器自己抢走手势（比如长按被识别成系统菜单/滚动）时会发 pointercancel。
+ * 这时不能立刻放弃长按——手指往往还在原地按着，留给计时器继续跑。
+ */
+function onPointerCancel(event: PointerEvent): void {
+  const dx = event.clientX - startX
+  const dy = event.clientY - startY
+  if (Math.hypot(dx, dy) > MOVE_TOLERANCE) clearPressTimer()
+}
+
+/** 系统把长按识别成菜单时也会走这里：屏蔽菜单，并当成一次长按 */
+function onContextMenu(event: Event): void {
+  event.preventDefault()
+  // 桌面端右键不参与多选
+  if (window.matchMedia('(min-width: 1024px)').matches) return
+  if (longPressFired) return
+  fireLongPress()
 }
 
 function onRowClick(): void {
@@ -88,7 +130,7 @@ const recipients = computed(() => {
     底色/边框色都写在状态分支里——基础类里的 max-lg: 变体优先级更高，会盖掉状态色。
   -->
   <div
-    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:mb-px max-lg:border max-lg:border-solid max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]"
+    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:mb-px max-lg:touch-pan-y max-lg:border max-lg:border-solid max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]"
     :class="[
       active || selected
         ? 'bg-brand-ghost max-lg:rounded-[20px] max-lg:border-transparent'
@@ -98,10 +140,10 @@ const recipients = computed(() => {
     ]"
     @click="onRowClick"
     @pointerdown="onPointerDown"
-    @pointerup="clearPressTimer"
-    @pointercancel="clearPressTimer"
-    @pointermove="clearPressTimer"
-    @pointerleave="clearPressTimer"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerEnd"
+    @pointercancel="onPointerCancel"
+    @contextmenu="onContextMenu"
   >
     <!--
       勾选框只在 hover 时显形，触屏上既看不见也点不准，
