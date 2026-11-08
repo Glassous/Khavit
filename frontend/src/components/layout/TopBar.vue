@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import gsap from 'gsap'
 import {
   Archive,
   ArrowLeft,
@@ -94,6 +95,70 @@ function pickFilter(key: 'all' | 'unread' | 'starred'): void {
 function onDocumentClick(event: MouseEvent): void {
   const target = event.target as HTMLElement | null
   if (!target?.closest('[data-filter-menu]')) filterMenu.value = false
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/**
+ * 筛选卡片的进出场：卡片右上角与「更多」按钮右上角对齐（CSS 定位），
+ * 这里只做以右上角为原点的缩放 + 轻微位移，视觉上就是「从这个按钮里长出来」。
+ * 每一项再错开一点点延迟跟上，避免整块一起弹。
+ */
+function onFilterMenuEnter(el: Element, done: () => void): void {
+  if (prefersReducedMotion()) {
+    done()
+    return
+  }
+  const card = el as HTMLElement
+  const items = card.querySelectorAll<HTMLElement>('[data-filter-item]')
+
+  gsap.killTweensOf([card, ...items])
+  gsap.fromTo(
+    card,
+    { autoAlpha: 0, scale: 0.82, y: -8 },
+    {
+      autoAlpha: 1,
+      scale: 1,
+      y: 0,
+      duration: 0.22,
+      ease: 'power3.out',
+      onComplete: () => {
+        gsap.set(card, { clearProps: 'opacity,visibility,transform' })
+        done()
+      },
+    },
+  )
+  gsap.fromTo(
+    items,
+    { autoAlpha: 0, x: 10 },
+    {
+      autoAlpha: 1,
+      x: 0,
+      duration: 0.18,
+      ease: 'power2.out',
+      stagger: 0.03,
+      delay: 0.03,
+      clearProps: 'opacity,visibility,transform',
+    },
+  )
+}
+
+function onFilterMenuLeave(el: Element, done: () => void): void {
+  if (prefersReducedMotion()) {
+    done()
+    return
+  }
+  gsap.killTweensOf(el)
+  gsap.to(el, {
+    autoAlpha: 0,
+    scale: 0.9,
+    y: -6,
+    duration: 0.12,
+    ease: 'power2.in',
+    onComplete: done,
+  })
 }
 
 watch(filterMenu, (open) => {
@@ -455,19 +520,19 @@ onBeforeUnmount(() => {
         <MoreVertical class="h-[22px] w-[22px]" :stroke-width="2.2" />
       </button>
 
-      <Transition
-        enter-active-class="transition duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-        enter-from-class="opacity-0 -translate-y-1 scale-95"
-        leave-active-class="transition duration-100 ease-in"
-        leave-to-class="opacity-0 -translate-y-1 scale-95"
-      >
+      <!--
+        卡片从「更多」按钮的位置原地展开：右上角与按钮右上角对齐，
+        以右上角为缩放原点（origin-top-right），配合 GSAP 曲线往外长出来。
+      -->
+      <Transition :css="false" @enter="onFilterMenuEnter" @leave="onFilterMenuLeave">
         <div
           v-if="filterMenu"
-          class="absolute right-0 top-[calc(100%+10px)] z-50 w-[172px] rounded-[14px] border border-line bg-surface p-1.5 shadow-pop"
+          class="absolute right-0 top-0 z-50 w-[172px] origin-top-right rounded-[14px] border border-line bg-surface p-1.5 shadow-pop"
         >
           <button
             v-for="item in filterOptions"
             :key="item.key"
+            data-filter-item
             type="button"
             class="flex w-full cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13.5px] transition-colors"
             :class="
