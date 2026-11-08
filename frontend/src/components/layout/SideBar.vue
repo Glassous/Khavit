@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Archive,
@@ -33,7 +33,7 @@ const mail = useMailStore()
 const composer = useComposerStore()
 const router = useRouter()
 const route = useRoute()
-const { isDesktop, drawerOpen, closeDrawer } = useSidebar()
+const { isDesktop, drawerOpen, closeDrawer, drawerDragging, drawerDrag } = useSidebar()
 const { panel, toggle: togglePanel } = useIslandPanel()
 
 /* ---------------------------------- 手势 ---------------------------------- */
@@ -47,6 +47,46 @@ const dragging = ref(false)
 /** 相对打开位置的横向位移，始终 <= 0（向左为负） */
 const dragOffset = ref(0)
 
+/**
+ * 遮罩的明暗：抽屉完全打开时为 1，关闭动画把它滚回 0。
+ * 放在内层元素上，跟手拖动时可以直接改透明度而不影响外层。
+ */
+const maskOpacity = ref(0)
+/** 松手回弹 / 开关时给遮罩加过渡；跟手阶段不加，否则会拖不动 */
+const maskSmooth = ref(false)
+
+/** 实际显示的不透明度：右滑拉出时直接取手势进度，其余情况用上面的目标值 */
+const maskLevel = computed(() => {
+  if (!drawerDragging.value) return maskOpacity.value
+  const width = asideRef.value?.offsetWidth ?? 320
+  return Math.min(1, drawerDrag.value / width)
+})
+
+/** 抽屉的实时位移：右滑拉出从 -100% 开始跟手，左滑收起从 0 开始跟手 */
+const asideStyle = computed(() => {
+  if (drawerDragging.value) return { translate: `calc(-100% + ${drawerDrag.value}px) 0` }
+  if (dragging.value) return { translate: `${dragOffset.value}px 0` }
+  return undefined
+})
+
+watch(
+  () => props.open,
+  (open) => {
+    // 手势提交时抽屉已经贴手到位，不需要再淡入
+    maskSmooth.value = !drawerDragging.value
+    maskOpacity.value = open ? 1 : 0
+  },
+)
+
+watch(drawerDragging, (isDragging) => {
+  if (isDragging) {
+    maskSmooth.value = false
+    return
+  }
+  // 没拉到位就松手：抽屉缩回去，遮罩跟着淡出
+  if (!props.open) maskSmooth.value = true
+})
+
 const AXIS_LOCK = 6
 let startX = 0
 let startY = 0
@@ -58,6 +98,7 @@ function onDragStart(event: PointerEvent): void {
   if (isDesktop.value || !props.open || event.pointerType === 'mouse') return
   dragging.value = true
   dragOffset.value = 0
+  maskSmooth.value = false
   startX = event.clientX
   startY = event.clientY
   startedAt = performance.now()
@@ -91,6 +132,9 @@ function onDragMove(event: PointerEvent): void {
   movedX = Math.max(movedX, Math.abs(dx))
   // 只允许往左拖（收起方向）
   dragOffset.value = Math.min(0, dx)
+  // 遮罩跟着抽屉位置一起变淡：抽屉移出多少，背景就露出多少
+  const width = asideRef.value?.offsetWidth ?? 320
+  maskOpacity.value = Math.max(0, 1 + dragOffset.value / width)
 }
 
 function onDragEnd(): void {
@@ -106,7 +150,15 @@ function onDragEnd(): void {
 
   // 阈值放低一点：轻扫一下就够关，不必拖满半个抽屉
   const shouldClose = -offset > Math.min(width * 0.22, 48) || velocity > 0.3
-  if (shouldClose) emit('close')
+  if (shouldClose) {
+    // 遮罩保持松手时的透明度，由 open → false 的监听接着淡出
+    emit('close')
+    return
+  }
+
+  // 没到阈值：抽屉弹回原位，遮罩平滑恢复全暗
+  maskSmooth.value = true
+  maskOpacity.value = 1
 }
 
 /** 拖拽结束时浏览器还会补一次 click，这里拦掉，避免误触侧栏里的按钮 */
@@ -182,19 +234,24 @@ async function openPanel(next: IslandPanel): Promise<void> {
 </script>
 
 <template>
-  <!-- 移动端遮罩：淡入淡出，避免抽屉滑入时背景突然变暗 -->
-  <Transition
-    enter-active-class="transition-opacity duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-    enter-from-class="opacity-0"
-    leave-active-class="transition-opacity duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-    leave-to-class="opacity-0"
+  <!--
+    移动端遮罩：常驻一层，透明度跟着抽屉位置走——
+    点击遮罩 / 返回键开关时 200ms 淡入淡出；右滑拉出、左滑收起时跟手变化，不加过渡。
+  -->
+  <div
+    class="fixed inset-0 z-30 lg:hidden"
+    :class="maskLevel > 0 ? 'pointer-events-auto' : 'pointer-events-none'"
+    @click="emit('close')"
   >
     <div
-      v-if="open"
-      class="fixed inset-0 z-30 bg-ink/30 backdrop-blur-[1px] lg:hidden"
-      @click="emit('close')"
+      class="absolute inset-0 bg-ink/30 dark:bg-black/60"
+      :class="[
+        maskLevel > 0 ? 'backdrop-blur-[1px]' : '',
+        maskSmooth ? 'transition-opacity duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]' : '',
+      ]"
+      :style="{ opacity: maskLevel }"
     />
-  </Transition>
+  </div>
 
   <!--
     宽度与文字同步过渡：文字用更短的时长淡出/淡入（100ms），
@@ -211,9 +268,9 @@ async function openPanel(next: IslandPanel): Promise<void> {
     :class="[
       collapsed ? 'w-[80px]' : 'w-[264px]',
       open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',
-      dragging ? 'max-lg:transition-none' : '',
+      dragging || drawerDragging ? 'max-lg:transition-none' : '',
     ]"
-    :style="dragging ? { translate: `${dragOffset}px 0` } : undefined"
+    :style="asideStyle"
     @pointerdown="onDragStart"
     @pointermove="onDragMove"
     @pointerup="onDragEnd"
@@ -238,25 +295,29 @@ async function openPanel(next: IslandPanel): Promise<void> {
     <div class="px-3 pb-1 pt-4 max-lg:pt-2">
       <button
         type="button"
-        class="group flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-brand text-[15px] font-medium text-white transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
+        class="group flex h-12 w-full cursor-pointer items-center justify-start gap-3 rounded-xl bg-brand text-[15px] font-medium text-white transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
+        :class="collapsed ? 'pl-[14px]' : 'pl-2 pr-3'"
         v-tooltip="collapsed ? '撰写邮件' : undefined"
         @click="compose"
       >
-        <PenLine
-          class="shrink-0 transition-[width,height] duration-200"
-          :class="collapsed ? 'h-[22px] w-[22px]' : 'h-[19px] w-[19px]'"
-          :stroke-width="2.1"
-        />
+        <span class="flex w-7 shrink-0 items-center justify-center">
+          <PenLine
+            class="transition-[width,height] duration-200"
+            :class="collapsed ? 'h-[22px] w-[22px]' : 'h-[19px] w-[19px]'"
+            :stroke-width="2.1"
+          />
+        </span>
         <!--
-          文字宽度必须一起过渡：若展开瞬间文字整块插入，内容宽度突然变大，
-          居中排布会把图标顶到左侧，随后又被拉回中间，看起来就是图标先漂移。
+          文字始终贴左，图标位置固定，不会因为文字收起/展开而漂移。
+          文字宽度一起过渡：收起瞬间直接消失会留下一个宽度跳变。
         -->
         <span
-          class="flex items-center overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin-left] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-          :class="collapsed ? 'ml-0 max-w-0 opacity-0' : 'ml-2 max-w-[96px] opacity-100'"
+          class="flex items-center overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          :class="collapsed ? 'max-w-0 opacity-0' : 'max-w-[96px] opacity-100'"
         >
           <span>撰写邮件</span>
-          <span class="ml-2 rounded border border-white/25 px-1 text-[10px] text-white/70">C</span>
+          <!-- 快捷键只在桌面端显示：响应式下没有实体键盘 -->
+          <span class="ml-2 rounded border border-white/25 px-1 text-[10px] text-white/70 max-lg:hidden">C</span>
         </span>
       </button>
     </div>

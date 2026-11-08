@@ -24,9 +24,18 @@ const collapsed = ref(readStored())
 const isDesktop = ref(typeof window === 'undefined' ? true : window.matchMedia(DESKTOP_QUERY).matches)
 /** 移动端抽屉是否展开 */
 const drawerOpen = ref(false)
+/** 列表页右滑拉出抽屉：手势进行中 */
+const drawerDragging = ref(false)
+/** 手势已经拉出的像素（0 = 完全收起） */
+const drawerDrag = ref(0)
 
 let bound = false
 let drawerLayer: BackLayerHandle | null = null
+
+/** 抽屉宽度，与 max-lg:w-[min(320px,86vw)] 保持一致 */
+function drawerWidth(): number {
+  return Math.min(320, window.innerWidth * 0.86)
+}
 
 function openDrawer(): void {
   if (drawerOpen.value) return
@@ -83,5 +92,50 @@ export function useSidebar() {
     else openDrawer()
   }
 
-  return { collapsed, isDesktop, drawerOpen, setCollapsed, toggle, toggleDrawer, closeDrawer }
+  /** 列表页右滑起手：只在响应式、抽屉收起时生效 */
+  function beginDrawerDrag(): void {
+    if (isDesktop.value || drawerOpen.value) return
+    drawerDragging.value = true
+    drawerDrag.value = 0
+  }
+
+  /** 跟手更新拉出距离（只允许向右，最大到抽屉全宽） */
+  function updateDrawerDrag(dx: number): void {
+    if (!drawerDragging.value) return
+    drawerDrag.value = Math.min(Math.max(dx, 0), drawerWidth())
+  }
+
+  /**
+   * 松手：过阈值直接打开，否则缩回。
+   * 结束手势与打开抽屉放在同一帧里，遮罩与抽屉都不会在中间闪一下。
+   */
+  function endDrawerDrag(): void {
+    if (!drawerDragging.value) return
+    const passed = drawerDrag.value > Math.min(drawerWidth() * 0.28, 72)
+    drawerDragging.value = false
+    drawerDrag.value = 0
+    if (passed) openDrawer()
+  }
+
+  /** 手势被系统打断：原地缩回 */
+  function cancelDrawerDrag(): void {
+    drawerDragging.value = false
+    drawerDrag.value = 0
+  }
+
+  return {
+    collapsed,
+    isDesktop,
+    drawerOpen,
+    drawerDragging,
+    drawerDrag,
+    setCollapsed,
+    toggle,
+    toggleDrawer,
+    closeDrawer,
+    beginDrawerDrag,
+    updateDrawerDrag,
+    endDrawerDrag,
+    cancelDrawerDrag,
+  }
 }

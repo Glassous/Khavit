@@ -11,6 +11,7 @@ import AppEmpty from '../ui/AppEmpty.vue'
 import { useDensity } from '../../composables/useDensity'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
+import { useSidebar } from '../../composables/useSidebar'
 
 const props = withDefaults(
   defineProps<{
@@ -25,6 +26,76 @@ const auth = useAuthStore()
 const toast = useToast()
 /** 紧凑/舒适密度由设置页控制，这里只负责把状态传下去 */
 const { compact } = useDensity()
+/** 列表页右滑拉出侧栏（仅响应式） */
+const {
+  isDesktop,
+  drawerOpen,
+  beginDrawerDrag,
+  updateDrawerDrag,
+  endDrawerDrag,
+  cancelDrawerDrag,
+} = useSidebar()
+
+/**
+ * 右滑开启抽屉：先判断是不是「向右的水平手势」，判定成功后才接管，
+ * 纵向滚动与点按都不受影响。设置/管理后台是盖在列表上的面板，
+ * 指针事件到不了列表，自然也不会触发这里。
+ */
+const SWIPE_LOCK = 10
+
+let swipeTracking = false
+let swipeActive = false
+let swipeStartX = 0
+let swipeStartY = 0
+let swipeEndedAt = 0
+
+function canSwipeOpen(): boolean {
+  return !isDesktop.value && !drawerOpen.value && !props.expandedId
+}
+
+function onListPointerDown(event: PointerEvent): void {
+  if (!event.isPrimary || event.pointerType === 'mouse' || !canSwipeOpen()) return
+  swipeTracking = true
+  swipeActive = false
+  swipeStartX = event.clientX
+  swipeStartY = event.clientY
+}
+
+function onListPointerMove(event: PointerEvent): void {
+  if (!swipeTracking) return
+  const dx = event.clientX - swipeStartX
+  const dy = event.clientY - swipeStartY
+
+  if (!swipeActive) {
+    // 只认向右的横向手势：竖向滚动、向左划都交还给列表
+    if (dx < SWIPE_LOCK || Math.abs(dx) < Math.abs(dy) * 1.2) return
+    swipeActive = true
+    beginDrawerDrag()
+  }
+
+  updateDrawerDrag(dx)
+}
+
+function onListPointerEnd(event: PointerEvent): void {
+  if (!swipeTracking) return
+  const active = swipeActive
+  swipeTracking = false
+  swipeActive = false
+  if (!active) return
+
+  if (event.type === 'pointercancel') cancelDrawerDrag()
+  else {
+    endDrawerDrag()
+    // 给随后可能补发的 click 留一个窗口，避免顺手打开邮件
+    swipeEndedAt = performance.now()
+  }
+}
+
+function onListClickCapture(event: MouseEvent): void {
+  if (performance.now() - swipeEndedAt > 350) return
+  event.stopPropagation()
+  event.preventDefault()
+}
 
 const emit = defineEmits<{ select: [id: string] }>()
 
@@ -77,6 +148,8 @@ watch(() => mail.currentMailboxId, () => {
 onBeforeUnmount(() => {
   clearSelection()
   topBar.reset()
+  // 手势还没结束时离开页面：把抽屉的跟手状态复位，避免下次进来停在半开
+  if (swipeActive) cancelDrawerDrag()
 })
 
 async function bulkMarkRead(): Promise<void> {
@@ -114,9 +187,14 @@ async function refresh(): Promise<void> {
     <!-- 列表：桌面端吸顶表头 + 独立滚动；响应式下整页只有这一个滚动容器 -->
     <div
       ref="listRef"
-      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pl-[calc(0.5rem+var(--app-safe-left))] max-lg:pr-[calc(0.5rem+var(--app-safe-right))] max-lg:pb-[calc(0.75rem+var(--app-safe-bottom))] max-lg:pt-[var(--topbar-safe)]"
+      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:touch-pan-y max-lg:pl-[calc(0.5rem+var(--app-safe-left))] max-lg:pr-[calc(0.5rem+var(--app-safe-right))] max-lg:pb-[calc(0.75rem+var(--app-safe-bottom))] max-lg:pt-[var(--topbar-safe)]"
       :style="expanded ? { overflow: 'hidden' } : undefined"
       @scroll="onScroll"
+      @pointerdown="onListPointerDown"
+      @pointermove="onListPointerMove"
+      @pointerup="onListPointerEnd"
+      @pointercancel="onListPointerEnd"
+      @click.capture="onListClickCapture"
     >
       <!-- 响应式标题：跟着列表一起滚动，居左，文案取自当前文件夹（收件箱 / 搜索「…」等） -->
       <h2

@@ -190,11 +190,11 @@ const titleClass = computed(() => {
     ]
   }
   return [
-    'relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
-    'max-lg:mb-px max-lg:touch-pan-y max-lg:border max-lg:border-solid max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]',
+    'relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]',
+    'max-lg:mb-px max-lg:border-b-0 max-lg:touch-pan-y max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]',
     props.active || props.selected
-      ? 'bg-brand-ghost max-lg:rounded-[20px] max-lg:border-transparent'
-      : 'hover:bg-surface-2/70 max-lg:rounded-[14px] max-lg:border-line max-lg:bg-surface',
+      ? 'bg-brand-ghost max-lg:rounded-[20px]'
+      : 'hover:bg-surface-2/70 max-lg:rounded-[14px] max-lg:bg-surface',
     unread.value ? 'is-unread' : '',
     props.compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',
   ]
