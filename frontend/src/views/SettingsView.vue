@@ -144,7 +144,7 @@ async function logout(): Promise<void> {
             </span>
             <div class="min-w-0 flex-1">
               <h2 class="text-[14px] font-semibold text-ink">账号</h2>
-              <p class="mt-0.5 break-all text-[12.5px] text-ink-3">{{ auth.user }}</p>
+              <p class="selectable mt-0.5 break-all text-[12.5px] text-ink-3">{{ auth.user }}</p>
 
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <AppBadge :tone="auth.admin ? 'brand' : 'neutral'">
@@ -181,7 +181,7 @@ async function logout(): Promise<void> {
                   <span
                     v-for="alias in aliases"
                     :key="alias.email"
-                    class="rounded-md bg-surface-2 px-2 py-0.5 text-[11.5px] text-ink-2"
+                    class="selectable rounded-md bg-surface-2 px-2 py-0.5 text-[11.5px] text-ink-2"
                   >
                     {{ alias.email }}
                   </span>

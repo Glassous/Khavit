@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Check, CheckCheck, Menu, MoreHorizontal, Search, Trash2, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
 import { useMailStore } from '../../stores/mail'
 import { usePageChrome } from '../../composables/usePageChrome'
@@ -249,30 +249,33 @@ onBeforeUnmount(() => {
       若展开态用 max-width 收口、收起态又没写 max-width，收起瞬间 max-width 会跳到
       none，元素先弹回完整宽度（视觉上「向右展开、漂移」）再收缩，很难看。
       背景用不透明底色：顶栏本身透明，控件必须挡住从下方穿过的列表文字；
-      响应式下换成与侧栏同款的 canvas-deep、去掉边框与快捷键提示，只剩居中的放大镜。
+      响应式下底色取列表卡片同款 surface（浅色即白、深色即近黑），去掉边框与快捷键提示。
+      展开宽度按「左右内边距 16×2 + 汉堡 44 + 更多 44 + 两个间距 12×2」扣掉，
+      留 4px 余量，保证不会把右侧的更多按钮挤出屏幕。
     -->
     <div
       v-if="searchable && !selecting"
-      class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-canvas-deep max-lg:focus-within:border-transparent"
+      class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-surface max-lg:focus-within:border-transparent"
       :class="
         searchOpen
-          ? 'w-[min(360px,52vw)] rounded-[20px] border-line bg-surface focus-within:border-brand max-lg:w-[calc(100vw-6.5rem)]'
-          : 'w-[62px] rounded-[20px] border-line bg-surface hover:border-line-strong max-lg:w-11'
+          ? 'w-[min(360px,52vw)] rounded-[20px] border-line bg-surface focus-within:border-brand max-lg:w-[calc(100vw-9.25rem)]'
+          : 'w-[62px] rounded-[20px] border-line bg-surface hover:border-line-strong max-lg:w-[88px]'
       "
     >
-      <!-- 收起态：图标 + 展开快捷键（响应式下不显示快捷键，图标居中，整体是正圆） -->
+      <!-- 收起态：图标 + 展开快捷键（响应式下把快捷键换成「搜索」二字） -->
       <button
         v-show="!searchOpen"
         type="button"
-        class="absolute inset-0 flex cursor-pointer items-center justify-start gap-1.5 px-3 transition-colors max-lg:justify-center max-lg:px-0"
+        class="absolute inset-0 flex cursor-pointer items-center justify-start gap-1.5 px-3 transition-colors max-lg:gap-2"
         aria-label="搜索邮件"
         v-tooltip="'搜索邮件（/ 或 Ctrl+K）'"
         @click="openSearch"
       >
         <Search
-          class="h-4 w-4 shrink-0 text-ink-3 max-lg:h-[19px] max-lg:w-[19px]"
+          class="h-4 w-4 shrink-0 text-ink-3 max-lg:h-[18px] max-lg:w-[18px]"
           :stroke-width="2.1"
         />
+        <span class="hidden text-[13.5px] leading-none text-ink-3 max-lg:inline">搜索</span>
         <kbd
           class="rounded border border-line px-1 text-[10.5px] leading-4 text-ink-4 max-lg:hidden"
         >/</kbd>
@@ -321,7 +324,7 @@ onBeforeUnmount(() => {
         :aria-expanded="filterMenu"
         @click.stop="toggleFilterMenu"
       >
-        <MoreHorizontal class="h-[22px] w-[22px]" :stroke-width="2.2" />
+        <MoreVertical class="h-[22px] w-[22px]" :stroke-width="2.2" />
       </button>
 
       <Transition

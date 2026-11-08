@@ -10,6 +10,8 @@ import { useComposerStore } from '../stores/composer'
 import { useHotkeys } from '../composables/useHotkeys'
 import { useToast } from '../composables/useToast'
 import { useConfirm } from '../composables/useConfirm'
+import { useMailSelection } from '../composables/useMailSelection'
+import { useSidebar } from '../composables/useSidebar'
 import type { Mailbox } from '../jmap/types'
 
 const auth = useAuthStore()
@@ -19,6 +21,8 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { confirm } = useConfirm()
+const { count: selectedCount } = useMailSelection()
+const { isDesktop } = useSidebar()
 
 const mobileReader = ref(false)
 
@@ -63,6 +67,8 @@ watch(
 )
 
 async function openEmail(id: string): Promise<void> {
+  // 响应式多选态下锁住详情：有选中项时点击列表只做选择，不跳阅读页
+  if (!isDesktop.value && selectedCount.value > 0) return
   mobileReader.value = true
   await mail.openEmail(id)
 }

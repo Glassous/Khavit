@@ -27,10 +27,9 @@ const emit = defineEmits<{
 
 /** 长按选中的计时器：触屏长按 420ms 进入选中 */
 const LONG_PRESS_MS = 420
-/** 长按触发后的一小段时间内忽略随后的 click，避免"选中又打开邮件" */
-const CLICK_AFTER_LONG_PRESS = 800
 let pressTimer: number | undefined
-let longPressAt = 0
+/** 本次按压已经触发过长按：松手后那一次 click 必须吞掉，否则会误开详情/误取消选中 */
+let longPressFired = false
 
 function clearPressTimer(): void {
   if (pressTimer !== undefined) {
@@ -43,16 +42,21 @@ function onPointerDown(event: PointerEvent): void {
   // 鼠标有勾选框与头像可点，不需要长按
   if (event.pointerType === 'mouse') return
   clearPressTimer()
+  longPressFired = false
   pressTimer = window.setTimeout(() => {
-    longPressAt = Date.now()
+    longPressFired = true
     emit('toggle-select', props.email.id)
     navigator.vibrate?.(12)
   }, LONG_PRESS_MS)
 }
 
 function onRowClick(): void {
-  // 长按已经切换过选中，随后的 click 直接吞掉
-  if (Date.now() - longPressAt < CLICK_AFTER_LONG_PRESS) return
+  // 长按已经切换过选中，随后的 click 直接吞掉（按住越久越容易漏，所以按标记判断而不是时间差）
+  if (longPressFired) {
+    longPressFired = false
+    return
+  }
+  // 多选态下整行点击只切换选中，绝不进入详情
   if (props.selectionMode) {
     emit('toggle-select', props.email.id)
     return
@@ -78,10 +82,17 @@ const recipients = computed(() => {
 </script>
 
 <template>
+  <!--
+    桌面端是列表行；响应式下每条邮件各自成岛（圆角 + 边框 + 间距），
+    选中时底色换成品牌浅色、圆角明显放大，和未选中拉开差距。
+    底色/边框色都写在状态分支里——基础类里的 max-lg: 变体优先级更高，会盖掉状态色。
+  -->
   <div
-    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150"
+    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-[background-color,border-color,border-radius] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:mb-px max-lg:border max-lg:border-solid max-lg:shadow-[0_1px_2px_rgb(15_21_32/0.05)]"
     :class="[
-      active || selected ? 'bg-brand-ghost' : 'hover:bg-surface-2/70',
+      active || selected
+        ? 'bg-brand-ghost max-lg:rounded-[26px] max-lg:border-brand/40'
+        : 'hover:bg-surface-2/70 max-lg:rounded-[14px] max-lg:border-line max-lg:bg-surface',
       unread ? 'is-unread' : '',
       compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',
     ]"

@@ -97,6 +97,20 @@
     /* 中文按字断行，英文长串（地址、附件名）才需要强制换行 */
     overflow-wrap: break-word;
     text-spacing-trim: normal;
+    /*
+      长按不再随手选中界面文字（移动端最明显：按住列表会跳出选择手柄）。
+      输入框、可编辑区与显式标了 .selectable 的字段仍可选中；
+      邮件正文在 sandbox iframe 里，是独立文档，不受这里影响。
+    */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable='true'] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   *:focus-visible {
@@ -142,6 +156,12 @@
     border: 1px solid var(--color-line);
   }
 
+  /* 全局禁用了长按选中，这些字段例外（邮箱地址等需要复制的内容） */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   .scroll-slim {
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-strong) transparent;
@@ -165,7 +185,7 @@
 
   /*
     响应式顶栏遮罩：始终渲染，不随滚动显隐。
-    - 底色是表面色 + 背景模糊，滚上来的列表会被「磨砂」掉；
+    - 底色与页面底色一致（--color-canvas-deep），滚动内容在顶栏下被「磨砂」掉；
     - 强度由 mask-image 给出：除顶部第一个像素外，整条都是「带一点透明度」的，
       而且越往下越透——多段色标把曲线压平，上半段掉得慢、下半段掉得快，
       不会出现「上 30% 一刀切全不透明 + 突然变陡」的台阶感；
@@ -177,7 +197,7 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background-color: var(--color-surface);
+    background-color: var(--color-canvas-deep);
     -webkit-backdrop-filter: blur(14px) saturate(1.35);
     backdrop-filter: blur(14px) saturate(1.35);
     -webkit-mask-image: linear-gradient(
@@ -226,6 +246,16 @@
 
   .unread-bar.is-unread::before {
     opacity: 1;
+  }
+
+  /*
+    响应式下列表每条邮件都是独立小岛（自带圆角），
+    左侧通高强调条会横穿圆角，改由加粗的字重表示未读。
+  */
+  @media (width < 64rem) {
+    .unread-bar::before {
+      display: none;
+    }
   }
 }
 

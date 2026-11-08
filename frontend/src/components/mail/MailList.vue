@@ -83,19 +83,25 @@ async function refresh(): Promise<void> {
 
 <template>
   <!--
-    响应式下不再被「岛」包住：整屏通铺，直接延伸到顶栏之下（顶栏透明，可透过它看到列表）。
-    列表头、筛选行与邮件行是同一条滚动流，上滑时整体穿过顶栏区域；
-    顶部安全距离只作为滚动容器的 padding，一滑动就让位。
+    响应式下不再套一层大「岛」：列表容器透明、铺满，邮件各自的小岛直接浮在页面上。
+    顶部安全距离与左右留白都由滚动容器的 padding 给出，一滑动就让位。
   -->
   <section
-    class="flex h-full w-[372px] shrink-0 flex-col border-r border-line bg-surface/40 max-xl:w-[330px] max-lg:w-full max-lg:border-r-0 max-lg:bg-surface"
+    class="flex h-full w-[372px] shrink-0 flex-col border-r border-line bg-surface/40 max-xl:w-[330px] max-lg:h-auto max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:border-r-0 max-lg:bg-transparent"
   >
     <!-- 列表：桌面端吸顶表头 + 独立滚动；响应式下整页只有这一个滚动容器 -->
     <div
       ref="listRef"
-      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pt-[var(--topbar-safe)]"
+      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:px-2 max-lg:pb-3 max-lg:pt-[var(--topbar-safe)]"
       @scroll="onScroll"
     >
+      <!-- 响应式标题：跟着列表一起滚动，居左，文案取自当前文件夹（收件箱 / 搜索「…」等） -->
+      <h2
+        class="hidden truncate px-2 pb-2 pt-1 text-[17px] font-semibold tracking-tight text-ink max-lg:block"
+      >
+        {{ title }}
+      </h2>
+
       <!-- 列表头：响应式下整行隐藏（标题/计数/刷新交给顶栏与侧栏） -->
       <header
         class="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 max-lg:hidden lg:sticky lg:top-0 lg:z-10"

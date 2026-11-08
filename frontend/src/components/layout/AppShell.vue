@@ -14,7 +14,7 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
 </script>
 
 <template>
-  <div class="relative flex h-dvh flex-col overflow-hidden bg-canvas-deep max-lg:bg-surface">
+  <div class="relative flex h-dvh flex-col overflow-hidden bg-canvas-deep">
     <!--
       响应式（< lg）：顶栏脱离文档流，绝对定位悬浮在内容之上并且完全透明，
       内容可以一直延伸到屏幕顶端、从其下方穿过；各页面用 --topbar-safe 自行让出安全距离。
@@ -30,9 +30,12 @@ const emit = defineEmits<{ 'toggle-sidebar': [] }>()
       <!-- 侧栏由布局通过具名插槽提供，不在岛内 -->
       <slot name="sidebar" />
 
-      <!-- 主体内容：桌面端是四周留白的圆角岛；响应式下贯穿整屏，不再使用岛 -->
+      <!--
+        主体内容：桌面端是四周留白的圆角岛；响应式下外壳铺满整屏且透明，
+        页面各自决定要不要「岛」——邮件列表自带一个贯穿顶栏的浅色岛。
+      -->
       <div
-        class="m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0"
+        class="m-2 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[16px] border border-line bg-surface max-lg:m-0 max-lg:rounded-none max-lg:border-0 max-lg:bg-transparent"
       >
         <slot />
       </div>
