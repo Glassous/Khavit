@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Check, CheckCheck, Menu, MoreVertical, Search, Trash2, X } from 'lucide-vue-next'
+import {
+  Archive,
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  MailOpen,
+  Menu,
+  MoreVertical,
+  Search,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
 import BrandMark from '../ui/BrandMark.vue'
 import { useMailStore } from '../../stores/mail'
 import { useIslandPanel } from '../../composables/useIslandPanel'
@@ -9,6 +21,8 @@ import { PANEL_TITLES } from '../../utils/panel'
 import { useMailSelection } from '../../composables/useMailSelection'
 import { useSidebar } from '../../composables/useSidebar'
 import { useTopBarAutoHide } from '../../composables/useTopBarAutoHide'
+import { useMobileReader } from '../../composables/useMobileReader'
+import { useMailActions } from '../../composables/useMailActions'
 
 withDefaults(
   defineProps<{ searchable?: boolean; showSidebarToggle?: boolean; sidebarCollapsed?: boolean }>(),
@@ -39,8 +53,27 @@ const { isDesktop } = useSidebar()
 /** 响应式顶栏随列表下滑收起、上滑原地恢复 */
 const { hidden: topBarHidden, show: showTopBar } = useTopBarAutoHide()
 
-/** 响应式多选态：桌面端列表自带批量条，这里只在窄屏接管顶栏 */
-const selecting = computed(() => !isDesktop.value && selectedCount.value > 0)
+/**
+ * 响应式正文页。正文页自己的工具条在窄屏整条隐藏，功能搬到顶栏：
+ * 返回键右边不显示标题，直接是星标 / 未读 / 归档 / 删除这一排按钮。
+ */
+const { reading } = useMobileReader()
+const { toggleStar, markUnread, archive, remove } = useMailActions()
+const readingMobile = computed(() => !isDesktop.value && reading.value && Boolean(mail.selectedId))
+const starred = computed(() => Boolean(mail.selectedEmail?.keywords?.$flagged))
+
+/** 响应式多选态：桌面端列表自带批量条，这里只在窄屏接管顶栏（正文页不参与） */
+const selecting = computed(() => !isDesktop.value && selectedCount.value > 0 && !readingMobile.value)
+
+/** 顶栏返回键：面板打开时关面板，正文页时退回列表 */
+function onBack(): void {
+  if (panelOpen.value) {
+    void closePanel()
+    return
+  }
+  reading.value = false
+  mail.closeEmail()
+}
 
 const filterOptions = [
   { key: 'all', label: '全部' },
@@ -191,24 +224,24 @@ onBeforeUnmount(() => {
     </RouterLink>
 
     <!--
-      响应式：面板打开时汉堡按钮就地变成返回键（同一位置、同一尺寸），
-      语义从「打开菜单」换成「关掉面板、回到列表」。
+      响应式：面板打开或正在看正文时，汉堡按钮就地变成返回键（同一位置、同一尺寸），
+      语义从「打开菜单」换成「回到列表」。
       底色改用 surface：面板的底色是外壳色，canvas-deep 的圆底会看不见。
     -->
     <button
-      v-if="panelOpen"
+      v-if="panelOpen || readingMobile"
       type="button"
       class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="返回"
       v-tooltip="'返回列表'"
-      @click="closePanel"
+      @click="onBack"
     >
       <ArrowLeft class="h-[22px] w-[22px]" :stroke-width="2.2" />
     </button>
 
-    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开）；面板打开时让位给返回键 -->
+    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开）；面板/正文页让位给返回键 -->
     <button
-      v-if="showSidebarToggle && !panelOpen"
+      v-if="showSidebarToggle && !panelOpen && !readingMobile"
       type="button"
       class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
@@ -217,6 +250,50 @@ onBeforeUnmount(() => {
     >
       <Menu class="h-[22px] w-[22px]" :stroke-width="2.2" />
     </button>
+
+    <!--
+      响应式正文页：返回键右边不写字，这排邮件操作整体靠右，
+      按钮样式与列表页多选态那排一致（同一个尺寸、同一个圆底、同一套 hover）。
+    -->
+    <div v-if="readingMobile" class="ml-auto flex min-w-0 shrink-0 items-center gap-0.5">
+      <button
+        type="button"
+        class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep transition-colors duration-150 hover:bg-surface-2 active:scale-95"
+        :class="starred ? 'text-gold' : 'text-ink-2 hover:text-ink'"
+        :aria-label="starred ? '取消星标' : '加星标'"
+        v-tooltip="starred ? '取消星标' : '加星标'"
+        @click="toggleStar"
+      >
+        <Star class="h-[21px] w-[21px]" :stroke-width="2.2" :fill="starred ? 'currentColor' : 'none'" />
+      </button>
+      <button
+        type="button"
+        class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="标记为未读"
+        v-tooltip="'标记为未读'"
+        @click="markUnread"
+      >
+        <MailOpen class="h-[21px] w-[21px]" :stroke-width="2.2" />
+      </button>
+      <button
+        type="button"
+        class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"
+        aria-label="归档"
+        v-tooltip="'归档'"
+        @click="archive"
+      >
+        <Archive class="h-[21px] w-[21px]" :stroke-width="2.2" />
+      </button>
+      <button
+        type="button"
+        class="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-danger/10 hover:text-danger active:scale-95"
+        aria-label="删除"
+        v-tooltip="'删除'"
+        @click="remove"
+      >
+        <Trash2 class="h-[21px] w-[21px]" :stroke-width="2.2" />
+      </button>
+    </div>
     <button
       v-if="showSidebarToggle"
       type="button"
@@ -292,7 +369,7 @@ onBeforeUnmount(() => {
     </h1>
 
     <div
-      v-if="searchable && !selecting && !panelOpen"
+      v-if="searchable && !selecting && !panelOpen && !readingMobile"
       class="relative -ml-2 h-10 shrink-0 overflow-hidden border transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:ml-0 max-lg:h-11 max-lg:rounded-full max-lg:border-transparent max-lg:bg-surface max-lg:focus-within:border-transparent"
       :class="
         searchOpen
@@ -354,7 +431,11 @@ onBeforeUnmount(() => {
       响应式「更多」：呼出卡片筛选 全部 / 未读 / 星标，
       替代被隐藏的列表第二行；桌面端不渲染（列表里自带）。
     -->
-    <div v-if="searchable && !isDesktop && !selecting && !panelOpen" class="relative ml-auto" data-filter-menu>
+    <div
+      v-if="searchable && !isDesktop && !selecting && !panelOpen && !readingMobile"
+      class="relative ml-auto"
+      data-filter-menu
+    >
       <button
         type="button"
         class="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-canvas-deep text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink active:scale-95"

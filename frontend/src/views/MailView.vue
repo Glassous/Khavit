@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MailList from '../components/mail/MailList.vue'
 import MailReader from '../components/mail/MailReader.vue'
@@ -8,11 +8,11 @@ import { useAuthStore } from '../stores/auth'
 import { useMailStore } from '../stores/mail'
 import { useComposerStore } from '../stores/composer'
 import { useHotkeys } from '../composables/useHotkeys'
-import { useToast } from '../composables/useToast'
-import { useConfirm } from '../composables/useConfirm'
 import { useMailSelection } from '../composables/useMailSelection'
 import { useSidebar } from '../composables/useSidebar'
 import { useIslandPanel } from '../composables/useIslandPanel'
+import { useMobileReader } from '../composables/useMobileReader'
+import { useMailActions } from '../composables/useMailActions'
 import type { Mailbox } from '../jmap/types'
 
 const auth = useAuthStore()
@@ -20,11 +20,12 @@ const mail = useMailStore()
 const composer = useComposerStore()
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
-const { confirm } = useConfirm()
 const { count: selectedCount } = useMailSelection()
 const { isDesktop } = useSidebar()
 const { open: panelOpen } = useIslandPanel()
+/** 响应式正文页的开关与顶栏共享，顶栏据此切换成「返回 + 邮件操作」 */
+const { reading } = useMobileReader()
+const { markUnread, archive: archiveSelected, remove: removeSelected } = useMailActions()
 
 /**
  * 设置/管理后台盖在邮件页之上时，邮件页的快捷键全部让位：
@@ -32,9 +33,7 @@ const { open: panelOpen } = useIslandPanel()
  */
 const hotkeysActive = (): boolean => !panelOpen.value
 
-const mobileReader = ref(false)
-
-const readingOnMobile = computed(() => mobileReader.value && Boolean(mail.selectedId))
+const readingOnMobile = computed(() => reading.value && Boolean(mail.selectedId))
 
 function resolveMailbox(slug?: string): Mailbox | undefined {
   if (!slug) return auth.mailboxes.find((item) => item.role === 'inbox') ?? auth.mailboxes[0]
@@ -84,49 +83,13 @@ watch(
 async function openEmail(id: string): Promise<void> {
   // 响应式多选态下锁住详情：有选中项时点击列表只做选择，不跳阅读页
   if (!isDesktop.value && selectedCount.value > 0) return
-  mobileReader.value = true
+  reading.value = true
   await mail.openEmail(id)
 }
 
 function backToList(): void {
-  mobileReader.value = false
+  reading.value = false
   mail.closeEmail()
-}
-
-async function removeSelected(): Promise<boolean> {
-  const current = mail.selectedEmail
-  if (!current) return false
-  const ok = await confirm({
-    title: '删除这封邮件？',
-    description: '在收件箱中删除会移入回收站，在回收站中删除则永久清除。',
-    confirmLabel: '删除',
-    tone: 'danger',
-  })
-  if (!ok) return false
-
-  const result = await mail.remove(current.id)
-  mobileReader.value = false
-  toast.action(result === 'moved' ? '已移入回收站' : '已永久删除', '撤销', () => {
-    void mail.loadFirstPage()
-  })
-  return true
-}
-
-async function archiveSelected(): Promise<void> {
-  const current = mail.selectedEmail
-  if (!current) return
-  await mail.archive(current.id)
-  mobileReader.value = false
-  toast.success('已归档')
-}
-
-async function markUnread(): Promise<void> {
-  const current = mail.selectedEmail
-  if (!current) return
-  await mail.toggleRead(current.id, false)
-  mail.closeEmail()
-  mobileReader.value = false
-  toast.success('已标记为未读')
 }
 
 useHotkeys([
@@ -151,7 +114,7 @@ useHotkeys([
   {
     key: 'Escape',
     handler: () => {
-      if (mobileReader.value) backToList()
+      if (reading.value) backToList()
       else mail.closeEmail()
     },
     when: hotkeysActive,
@@ -171,7 +134,6 @@ useHotkeys([
       :email="mail.selectedEmail"
       :loading="mail.loadingEmail"
       :class="readingOnMobile ? '' : 'max-lg:hidden'"
-      @back="backToList"
       @star="(value) => mail.setStarred(mail.selectedId, value)"
       @unread="markUnread"
       @archive="archiveSelected"

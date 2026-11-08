@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { Archive, ArrowLeft, CornerUpLeft, CornerUpRight, MailOpen, Star, Trash2 } from 'lucide-vue-next'
-import type { Email } from '../../jmap/types'
+import { Archive, CornerUpLeft, CornerUpRight, MailOpen, Star, Trash2 } from 'lucide-vue-next'
 
-withDefaults(defineProps<{ email: Email; starred?: boolean }>(), { starred: false })
+withDefaults(defineProps<{ starred?: boolean }>(), { starred: false })
 
 const emit = defineEmits<{
-  back: []
   star: []
   unread: []
   reply: []
@@ -16,17 +14,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="flex h-12 shrink-0 items-center gap-0.5 border-b border-line px-2">
-    <button
-      type="button"
-      class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink lg:hidden"
-      aria-label="返回列表"
-      v-tooltip="'返回列表'"
-      @click="emit('back')"
-    >
-      <ArrowLeft class="h-4 w-4" />
-    </button>
-
+  <!--
+    桌面端工具条。响应式下整条隐藏：
+    星标/未读/归档/删除移到顶栏，回复/转发换成正文底部的两个悬浮胶囊。
+  -->
+  <div class="flex h-12 shrink-0 items-center gap-0.5 border-b border-line px-2 max-lg:hidden">
     <button
       type="button"
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-gold"
