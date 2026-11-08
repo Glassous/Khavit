@@ -90,6 +90,7 @@ function onPick(files: FileList): void {
             type="button"
             class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
             :aria-label="composer.expanded ? '还原窗口' : '最大化'"
+            v-tooltip="composer.expanded ? '还原窗口' : '最大化'"
             @click="composer.expanded = !composer.expanded"
           >
             <component :is="composer.expanded ? ChevronDown : ChevronUp" class="h-4 w-4" />
@@ -98,6 +99,7 @@ function onPick(files: FileList): void {
             type="button"
             class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
             aria-label="关闭并保存草稿"
+            v-tooltip="'关闭并保存草稿'"
             @click="composer.close()"
           >
             <X class="h-4 w-4" />
@@ -156,6 +158,7 @@ function onPick(files: FileList): void {
                 type="button"
                 class="cursor-pointer rounded p-0.5 text-ink-4 transition-colors hover:text-danger"
                 :aria-label="`移除附件 ${item.name}`"
+                v-tooltip="`移除附件 ${item.name}`"
                 @click="composer.removeAttachment(item.blobId)"
               >
                 <Trash2 class="h-3 w-3" />

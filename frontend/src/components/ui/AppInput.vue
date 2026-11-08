@@ -71,6 +71,7 @@ const wrapper = computed(() =>
         type="button"
         class="cursor-pointer rounded p-1 text-ink-3 transition-colors hover:text-ink"
         :aria-label="revealed ? '隐藏密码' : '显示密码'"
+        v-tooltip="revealed ? '隐藏密码' : '显示密码'"
         @click="revealed = !revealed"
       >
         <component :is="revealed ? EyeOff : Eye" class="h-4 w-4" />

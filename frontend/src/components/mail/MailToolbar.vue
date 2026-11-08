@@ -21,6 +21,7 @@ const emit = defineEmits<{
       type="button"
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink lg:hidden"
       aria-label="返回列表"
+      v-tooltip="'返回列表'"
       @click="emit('back')"
     >
       <ArrowLeft class="h-4 w-4" />
@@ -31,6 +32,7 @@ const emit = defineEmits<{
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-gold"
       :class="starred ? 'text-gold' : ''"
       :aria-label="starred ? '取消星标' : '加星标'"
+      v-tooltip="starred ? '取消星标' : '加星标'"
       @click="emit('star')"
     >
       <Star class="h-4 w-4" :fill="starred ? 'currentColor' : 'none'" />
@@ -40,6 +42,7 @@ const emit = defineEmits<{
       type="button"
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
       aria-label="标记为未读"
+      v-tooltip="'标记为未读'"
       @click="emit('unread')"
     >
       <MailOpen class="h-4 w-4" />
@@ -49,6 +52,7 @@ const emit = defineEmits<{
       type="button"
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
       aria-label="归档"
+      v-tooltip="'归档'"
       @click="emit('archive')"
     >
       <Archive class="h-4 w-4" />
@@ -58,6 +62,7 @@ const emit = defineEmits<{
       type="button"
       class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-danger/10 hover:text-danger"
       aria-label="删除"
+      v-tooltip="'删除'"
       @click="emit('remove')"
     >
       <Trash2 class="h-4 w-4" />

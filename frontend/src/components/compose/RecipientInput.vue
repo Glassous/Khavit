@@ -89,6 +89,7 @@ defineExpose({ focus })
         type="button"
         class="cursor-pointer rounded p-0.5 transition-colors hover:bg-brand/15"
         :aria-label="`移除 ${item.email}`"
+        v-tooltip="`移除 ${item.email}`"
         @click="remove(index)"
       >
         <X class="h-3 w-3" />

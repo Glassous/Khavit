@@ -132,6 +132,7 @@ function isAdmin(account: AccountRecord): boolean {
                   type="button"
                   class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
                   aria-label="编辑账号"
+                  v-tooltip="'编辑账号'"
                   @click="emit('edit', account)"
                 >
                   <Pencil class="h-3.5 w-3.5" />
@@ -140,6 +141,7 @@ function isAdmin(account: AccountRecord): boolean {
                   type="button"
                   class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
                   aria-label="删除账号"
+                  v-tooltip="'删除账号'"
                   @click="emit('remove', account)"
                 >
                   <Trash2 class="h-3.5 w-3.5" />

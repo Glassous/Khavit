@@ -100,7 +100,7 @@ async function go(path: string): Promise<void> {
       <button
         type="button"
         class="group flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-brand text-[15px] font-medium text-white transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
-        :title="collapsed ? '撰写邮件' : undefined"
+        v-tooltip="collapsed ? '撰写邮件' : undefined"
         @click="compose"
       >
         <PenLine
@@ -134,7 +134,7 @@ async function go(path: string): Promise<void> {
             ? 'bg-surface font-medium text-ink'
             : 'text-ink-2 hover:bg-surface/70 hover:text-ink',
         ]"
-        :title="mailboxLabel(box)"
+        v-tooltip="collapsed ? mailboxLabel(box) : undefined"
         @click="select(box)"
       >
         <!-- 图标盒宽度固定，折叠时只放大图标本身，居中位置由行内边距带动 -->
@@ -188,7 +188,7 @@ async function go(path: string): Promise<void> {
         type="button"
         class="mb-1 flex w-full cursor-pointer items-center rounded-[10px] text-left text-[15px] text-ink-2 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:bg-surface/70 hover:text-ink"
         :class="collapsed ? 'gap-0 py-2.5 pl-[14px]' : 'gap-3 py-2.5 pl-2 pr-3'"
-        title="管理后台"
+        v-tooltip="collapsed ? '管理后台' : undefined"
         @click="go('/admin/domains')"
       >
         <span class="flex w-7 shrink-0 items-center justify-center">
@@ -214,7 +214,7 @@ async function go(path: string): Promise<void> {
         type="button"
         class="flex w-full cursor-pointer items-center rounded-[10px] text-left text-[16px] font-medium text-ink-2 transition-all duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:bg-surface/70 hover:text-ink"
         :class="collapsed ? 'gap-0 py-3 pl-[14px]' : 'gap-3 py-3 pl-2 pr-3'"
-        title="设置"
+        v-tooltip="collapsed ? '设置' : undefined"
         @click="go('/settings')"
       >
         <span class="flex w-7 shrink-0 items-center justify-center">

@@ -140,6 +140,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       type="button"
       class="-ml-3 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
+      v-tooltip="'打开菜单'"
       @click="emit('toggle-sidebar')"
     >
       <Menu class="h-6 w-6" :stroke-width="2.1" />
@@ -149,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       type="button"
       class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
       :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-      :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+      v-tooltip="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
       @click="emit('toggle-sidebar')"
     >
       <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
@@ -175,7 +176,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
         type="button"
         class="absolute inset-0 flex cursor-pointer items-center justify-start gap-1.5 px-3 transition-colors"
         aria-label="搜索邮件"
-        title="搜索邮件（/ 或 Ctrl+K）"
+        v-tooltip="'搜索邮件（/ 或 Ctrl+K）'"
         @click="openSearch"
       >
         <Search class="h-4 w-4 shrink-0 text-ink-3" :stroke-width="2.1" />
@@ -192,7 +193,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
           type="button"
           class="shrink-0 cursor-pointer rounded p-0.5 text-ink-3 transition-colors hover:text-ink"
           aria-label="关闭搜索"
-          title="关闭搜索"
+          v-tooltip="'关闭搜索（Esc）'"
           @click.stop="closeSearch"
         >
           <X class="h-4 w-4" :stroke-width="2.1" />
@@ -218,6 +219,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
         type="button"
         class="cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
         :aria-label="isDark ? '切换到浅色' : '切换到深色'"
+        v-tooltip="isDark ? '切换到浅色' : '切换到深色'"
         @click="toggle"
       >
         <component :is="isDark ? Sun : Moon" class="h-4.5 w-4.5" />

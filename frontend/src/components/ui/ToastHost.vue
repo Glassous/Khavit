@@ -52,6 +52,7 @@ const tones: Record<ToastTone, string> = {
             type="button"
             class="cursor-pointer rounded p-0.5 text-ink-4 transition-colors hover:text-ink"
             aria-label="关闭提示"
+            v-tooltip="'关闭提示'"
             @click="dismiss(item.id)"
           >
             <X class="h-3.5 w-3.5" />

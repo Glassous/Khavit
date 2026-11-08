@@ -56,7 +56,7 @@ const classes = computed(() =>
 </script>
 
 <template>
-  <button :type="type" :class="classes" :disabled="disabled || loading" :title="title">
+  <button :type="type" :class="classes" :disabled="disabled || loading" v-tooltip="title">
     <Loader2 v-if="loading" class="h-4 w-4 animate-spin" />
     <slot v-else name="icon" />
     <slot />

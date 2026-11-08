@@ -62,6 +62,7 @@ onBeforeUnmount(() => {
               type="button"
               class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
               aria-label="关闭"
+              v-tooltip="'关闭'"
               @click="close"
             >
               <X class="h-4 w-4" />

@@ -45,7 +45,7 @@ async function download(item: Attachment): Promise<void> {
       :key="item.partId"
       type="button"
       class="group flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-left transition-colors hover:border-brand/40 hover:bg-brand-ghost/40"
-      :title="`下载 ${item.name ?? ''}`"
+      v-tooltip="`下载 ${item.name ?? ''}`"
       @click="download(item)"
     >
       <component :is="iconOf(item.type)" class="h-3.5 w-3.5 shrink-0 text-ink-3" />

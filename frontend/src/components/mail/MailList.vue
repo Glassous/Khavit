@@ -110,6 +110,7 @@ async function bulkDelete(): Promise<void> {
         type="button"
         class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
         aria-label="刷新"
+        v-tooltip="'刷新'"
         @click="refresh"
       >
         <RefreshCw class="h-3.5 w-3.5" :class="mail.loading ? 'animate-spin' : ''" />
@@ -144,6 +145,7 @@ async function bulkDelete(): Promise<void> {
           type="button"
           class="ml-auto cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
           aria-label="标记为已读"
+          v-tooltip="'标记为已读'"
           @click="bulkMarkRead"
         >
           <CheckCheck class="h-4 w-4" />
@@ -152,6 +154,7 @@ async function bulkDelete(): Promise<void> {
           type="button"
           class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
           aria-label="删除所选"
+          v-tooltip="'删除所选'"
           @click="bulkDelete"
         >
           <Trash2 class="h-4 w-4" />

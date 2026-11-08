@@ -89,6 +89,7 @@ function managementLabel(value?: { '@type': string }): string {
                   type="button"
                   class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
                   aria-label="查看 DNS 记录"
+                  v-tooltip="'查看 DNS 记录'"
                   @click="emit('zone', domain)"
                 >
                   <FileCode2 class="h-3.5 w-3.5" />
@@ -102,6 +103,7 @@ function managementLabel(value?: { '@type': string }): string {
                       : 'text-ink-3 hover:bg-teal/10 hover:text-teal'
                   "
                   :aria-label="domain.enable ? '停用域名' : '启用域名'"
+                  v-tooltip="domain.enable ? '停用域名' : '启用域名'"
                   @click="emit('toggle', domain)"
                 >
                   <Power class="h-3.5 w-3.5" />

@@ -96,6 +96,7 @@ const recipients = computed(() => {
           class="shrink-0 cursor-pointer rounded p-0.5 transition-colors"
           :class="starred ? 'text-gold' : 'text-ink-4 opacity-0 hover:text-gold group-hover:opacity-100'"
           :aria-label="starred ? '取消星标' : '加星标'"
+          v-tooltip="starred ? '取消星标' : '加星标'"
           @click.stop="emit('star', email.id, !starred)"
         >
           <Star class="h-3.5 w-3.5" :fill="starred ? 'currentColor' : 'none'" />

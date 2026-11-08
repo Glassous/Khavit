@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ToastHost from './components/ui/ToastHost.vue'
+import AppTooltip from './components/ui/AppTooltip.vue'
 </script>
 
 <template>
@@ -13,4 +14,5 @@ import ToastHost from './components/ui/ToastHost.vue'
     </Transition>
   </RouterView>
   <ToastHost />
+  <AppTooltip />
 </template>
