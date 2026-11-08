@@ -147,7 +147,7 @@ async function refresh(): Promise<void> {
 <template>
   <div class="flex min-h-0 flex-1">
       <!-- 二级导航 -->
-      <aside class="hidden w-[208px] shrink-0 flex-col border-r border-line bg-canvas-deep/50 md:flex">
+      <aside class="hidden w-[208px] shrink-0 flex-col border-r border-line bg-canvas-deep/50 max-lg:pt-[var(--topbar-safe)] md:flex">
         <nav class="flex-1 px-2 pt-3">
           <p class="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-4">管理</p>
           <button
@@ -177,7 +177,7 @@ async function refresh(): Promise<void> {
       </aside>
 
       <!-- 主区 -->
-      <main class="min-w-0 flex-1 overflow-y-auto scroll-slim">
+      <main class="min-w-0 flex-1 overflow-y-auto scroll-slim max-lg:pt-[var(--topbar-safe)]">
         <div class="mx-auto w-full max-w-[1000px] px-4 py-5 sm:px-6">
           <header class="flex flex-wrap items-center justify-between gap-3">
             <p class="min-w-0 text-[12.5px] leading-relaxed text-ink-3">

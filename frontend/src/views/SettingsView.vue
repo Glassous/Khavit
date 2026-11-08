@@ -134,7 +134,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <div class="min-h-0 flex-1 overflow-y-auto scroll-slim">
+  <div class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pt-[var(--topbar-safe)]">
     <div class="mx-auto w-full max-w-[760px] px-4 py-5 sm:px-6">
         <!-- 账号 -->
         <section class="mb-4 rounded-[14px] border border-line bg-surface p-5">

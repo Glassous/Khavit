@@ -16,6 +16,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useMailStore } from '../../stores/mail'
 import { useComposerStore } from '../../stores/composer'
 import { mailboxLabel, roleOrder } from '../../utils/i18n'
+import BrandMark from '../ui/BrandMark.vue'
 import type { Mailbox } from '../../jmap/types'
 
 const props = withDefaults(defineProps<{ open?: boolean; collapsed?: boolean }>(), {
@@ -78,25 +79,51 @@ async function go(path: string): Promise<void> {
 </script>
 
 <template>
-  <!-- 移动端遮罩 -->
-  <div
-    v-if="open"
-    class="fixed inset-0 z-30 bg-ink/30 backdrop-blur-[1px] lg:hidden"
-    @click="emit('close')"
-  />
+  <!-- 移动端遮罩：淡入淡出，避免抽屉滑入时背景突然变暗 -->
+  <Transition
+    enter-active-class="transition-opacity duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+    enter-from-class="opacity-0"
+    leave-active-class="transition-opacity duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="open"
+      class="fixed inset-0 z-30 bg-ink/30 backdrop-blur-[1px] lg:hidden"
+      @click="emit('close')"
+    />
+  </Transition>
 
   <!--
     宽度与文字同步过渡：文字用更短的时长淡出/淡入（100ms），
     到宽度动画结束时文字早已消失，不会出现被挤压的中间态。
+    响应式下抽屉从左侧滑入/滑出（300ms），宽度放宽到 320px（窄屏按 86vw 收窄）。
+
+    注意：Tailwind v4 的 translate-* 生成的是 `translate` 属性而不是 `transform`，
+    过渡属性里必须带上 translate，否则抽屉是「瞬移」而不是滑动。
   -->
   <aside
-    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep transition-[width,transform] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[264px]"
+    class="z-40 flex h-full shrink-0 flex-col bg-canvas-deep transition-[width,transform,translate] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-[min(320px,86vw)] max-lg:pt-[env(safe-area-inset-top,0px)] max-lg:duration-300 max-lg:ease-[cubic-bezier(0.32,0.72,0,1)]"
     :class="[
       collapsed ? 'w-[80px]' : 'w-[264px]',
       open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full',
     ]"
   >
-    <div class="px-3 pb-1 pt-4">
+    <!--
+      响应式下顶栏不再显示品牌图标，图标挪到抽屉的第一行（只留标记，不放文字）；
+      桌面端仍由顶栏承担，这里只在抽屉里出现。
+    -->
+    <div class="flex items-center px-3 pt-3 lg:hidden">
+      <RouterLink
+        to="/mail"
+        class="flex items-center rounded-[10px] p-1"
+        aria-label="Khavit 邮箱"
+        @click="emit('close')"
+      >
+        <BrandMark class="h-7 w-7 text-brand" />
+      </RouterLink>
+    </div>
+
+    <div class="px-3 pb-1 pt-4 max-lg:pt-2">
       <button
         type="button"
         class="group flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-brand text-[15px] font-medium text-white transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"

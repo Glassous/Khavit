@@ -72,6 +72,14 @@
 }
 
 @layer base {
+  :root {
+    /* 移动端顶栏悬浮在内容之上（透明、可穿透）：
+       页面据此让出顶部安全距离 = 顶栏高度 + 刘海/状态栏安全区。
+       响应式顶栏比桌面端更高（64px），内部控件也更大，手指更好点。 */
+    --topbar-h: 4rem;
+    --topbar-safe: calc(4rem + env(safe-area-inset-top, 0px));
+  }
+
   html,
   body {
     height: 100%;
@@ -153,6 +161,53 @@
 
   .scroll-slim::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /*
+    响应式顶栏遮罩：始终渲染，不随滚动显隐。
+    - 底色是表面色 + 背景模糊，滚上来的列表会被「磨砂」掉；
+    - 强度由 mask-image 给出：除顶部第一个像素外，整条都是「带一点透明度」的，
+      而且越往下越透——多段色标把曲线压平，上半段掉得慢、下半段掉得快，
+      不会出现「上 30% 一刀切全不透明 + 突然变陡」的台阶感；
+    - backdrop-filter 与底色共用同一张 mask，模糊强度同样是渐变的。
+  */
+  .topbar-veil {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--color-surface);
+    -webkit-backdrop-filter: blur(14px) saturate(1.35);
+    backdrop-filter: blur(14px) saturate(1.35);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 1) 0%,
+      rgb(0 0 0 / 0.96) 10%,
+      rgb(0 0 0 / 0.9) 20%,
+      rgb(0 0 0 / 0.82) 30%,
+      rgb(0 0 0 / 0.72) 40%,
+      rgb(0 0 0 / 0.6) 50%,
+      rgb(0 0 0 / 0.47) 60%,
+      rgb(0 0 0 / 0.35) 70%,
+      rgb(0 0 0 / 0.23) 80%,
+      rgb(0 0 0 / 0.12) 90%,
+      rgb(0 0 0 / 0.02) 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 1) 0%,
+      rgb(0 0 0 / 0.96) 10%,
+      rgb(0 0 0 / 0.9) 20%,
+      rgb(0 0 0 / 0.82) 30%,
+      rgb(0 0 0 / 0.72) 40%,
+      rgb(0 0 0 / 0.6) 50%,
+      rgb(0 0 0 / 0.47) 60%,
+      rgb(0 0 0 / 0.35) 70%,
+      rgb(0 0 0 / 0.23) 80%,
+      rgb(0 0 0 / 0.12) 90%,
+      rgb(0 0 0 / 0.02) 100%
+    );
   }
 
   /* 未读左侧强调条 */

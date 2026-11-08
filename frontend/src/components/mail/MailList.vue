@@ -97,83 +97,101 @@ async function bulkDelete(): Promise<void> {
 </script>
 
 <template>
-  <section class="flex h-full w-[372px] shrink-0 flex-col border-r border-line bg-surface/40 max-xl:w-[330px] max-lg:w-full">
-    <!-- 列表头 -->
-    <header class="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3">
-      <input
-        type="checkbox"
-        :checked="checkedAll"
-        class="h-3.5 w-3.5 cursor-pointer rounded border-line-strong accent-brand"
-        aria-label="全选"
-        @change="toggleAll"
-      />
-      <h2 class="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">{{ title }}</h2>
-      <span class="shrink-0 text-[11.5px] tabular-nums text-ink-3">{{ formatNumber(mail.total) }} 封</span>
-      <button
-        type="button"
-        class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-        aria-label="刷新"
-        v-tooltip="'刷新'"
-        @click="refresh"
+  <!--
+    响应式下不再被「岛」包住：整屏通铺，直接延伸到顶栏之下（顶栏透明，可透过它看到列表）。
+    列表头、筛选行与邮件行是同一条滚动流，上滑时整体穿过顶栏区域；
+    顶部安全距离只作为滚动容器的 padding，一滑动就让位。
+  -->
+  <section
+    class="flex h-full w-[372px] shrink-0 flex-col border-r border-line bg-surface/40 max-xl:w-[330px] max-lg:w-full max-lg:border-r-0 max-lg:bg-surface"
+  >
+    <!-- 列表：桌面端吸顶表头 + 独立滚动；响应式下整页只有这一个滚动容器 -->
+    <div
+      ref="listRef"
+      class="min-h-0 flex-1 overflow-y-auto scroll-slim max-lg:pt-[var(--topbar-safe)]"
+      @scroll="onScroll"
+    >
+      <!-- 列表头 -->
+      <header
+        class="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 lg:sticky lg:top-0 lg:z-10"
       >
-        <RefreshCw class="h-3.5 w-3.5" :class="mail.loading ? 'animate-spin' : ''" />
-      </button>
-    </header>
-
-    <!-- 筛选 / 批量操作 -->
-    <div class="flex h-10 shrink-0 items-center gap-1 border-b border-line px-2">
-      <template v-if="selected.size === 0">
-        <button
-          v-for="item in filters"
-          :key="item.key"
-          type="button"
-          class="cursor-pointer rounded-md px-2 py-1 text-[12px] transition-colors"
-          :class="
-            mail.filter === item.key
-              ? 'bg-brand-ghost font-medium text-brand'
-              : 'text-ink-3 hover:bg-surface-2 hover:text-ink'
-          "
-          @click="mail.setFilter(item.key)"
-        >
-          {{ item.label }}
-        </button>
-        <span class="ml-auto pr-1 text-[11.5px] text-ink-4">
-          {{ mail.unreadInView > 0 ? `${mail.unreadInView} 封未读` : '' }}
+        <input
+          type="checkbox"
+          :checked="checkedAll"
+          class="h-3.5 w-3.5 cursor-pointer rounded border-line-strong accent-brand"
+          aria-label="全选"
+          @change="toggleAll"
+        />
+        <h2 class="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">{{ title }}</h2>
+        <span class="shrink-0 text-[11.5px] tabular-nums text-ink-3">
+          {{ formatNumber(mail.total) }} 封
         </span>
-      </template>
+        <button
+          type="button"
+          class="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+          aria-label="刷新"
+          v-tooltip="'刷新'"
+          @click="refresh"
+        >
+          <RefreshCw class="h-3.5 w-3.5" :class="mail.loading ? 'animate-spin' : ''" />
+        </button>
+      </header>
 
-      <template v-else>
-        <span class="px-1 text-[12px] font-medium text-ink">已选 {{ selected.size }} 封</span>
-        <button
-          type="button"
-          class="ml-auto cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-          aria-label="标记为已读"
-          v-tooltip="'标记为已读'"
-          @click="bulkMarkRead"
-        >
-          <CheckCheck class="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
-          aria-label="删除所选"
-          v-tooltip="'删除所选'"
-          @click="bulkDelete"
-        >
-          <Trash2 class="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          class="cursor-pointer rounded-md px-2 py-1 text-[12px] text-ink-3 transition-colors hover:text-ink"
-          @click="clearSelection"
-        >
-          取消
-        </button>
-      </template>
-    </div>
+      <!-- 筛选 / 批量操作 -->
+      <div
+        class="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-surface px-2 lg:sticky lg:top-12 lg:z-10"
+      >
+        <template v-if="selected.size === 0">
+          <button
+            v-for="item in filters"
+            :key="item.key"
+            type="button"
+            class="cursor-pointer rounded-md px-2 py-1 text-[12px] transition-colors"
+            :class="
+              mail.filter === item.key
+                ? 'bg-brand-ghost font-medium text-brand'
+                : 'text-ink-3 hover:bg-surface-2 hover:text-ink'
+            "
+            @click="mail.setFilter(item.key)"
+          >
+            {{ item.label }}
+          </button>
+          <span class="ml-auto pr-1 text-[11.5px] text-ink-4">
+            {{ mail.unreadInView > 0 ? `${mail.unreadInView} 封未读` : '' }}
+          </span>
+        </template>
 
-    <!-- 列表 -->
-    <div ref="listRef" class="min-h-0 flex-1 overflow-y-auto scroll-slim" @scroll="onScroll">
+        <template v-else>
+          <span class="px-1 text-[12px] font-medium text-ink">已选 {{ selected.size }} 封</span>
+          <button
+            type="button"
+            class="ml-auto cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+            aria-label="标记为已读"
+            v-tooltip="'标记为已读'"
+            @click="bulkMarkRead"
+          >
+            <CheckCheck class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded-md p-1.5 text-ink-3 transition-colors hover:bg-danger/10 hover:text-danger"
+            aria-label="删除所选"
+            v-tooltip="'删除所选'"
+            @click="bulkDelete"
+          >
+            <Trash2 class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded-md px-2 py-1 text-[12px] text-ink-3 transition-colors hover:text-ink"
+            @click="clearSelection"
+          >
+            取消
+          </button>
+        </template>
+      </div>
+
+      <!-- 邮件行 -->
       <div v-if="mail.loading" class="p-3">
         <div v-for="i in 6" :key="i" class="flex gap-3 border-b border-line/60 py-3">
           <div class="shimmer h-8 w-8 shrink-0 rounded-full" />

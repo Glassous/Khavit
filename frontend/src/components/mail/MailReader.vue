@@ -104,7 +104,10 @@ watch(senderDomain, (domain) => {
 </script>
 
 <template>
-  <section class="flex h-full min-w-0 flex-1 flex-col bg-surface">
+  <!-- 响应式下顶栏悬浮透明，阅读区整屏通铺并让出顶部安全距离 -->
+  <section
+    class="flex h-full min-w-0 flex-1 flex-col bg-surface max-lg:pt-[var(--topbar-safe)]"
+  >
     <!-- 加载态 -->
     <div v-if="loading" class="flex-1 p-6">
       <div class="flex items-center gap-3">

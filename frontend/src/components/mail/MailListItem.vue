@@ -39,15 +39,19 @@ const recipients = computed(() => {
 
 <template>
   <div
-    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150"
+    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150 max-lg:px-2"
     :class="[
       active ? 'bg-brand-ghost' : 'hover:bg-surface-2/70',
       unread ? 'is-unread' : '',
-      compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',
+      compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5 max-lg:gap-2',
     ]"
     @click="emit('select', email.id)"
   >
-    <div class="flex shrink-0 items-start" :class="compact ? 'pt-0' : 'pt-0.5'">
+    <!--
+      勾选框只在 hover 时显形，触屏上既看不见也点不准，
+      响应式下直接让出这一列，头像才能贴近左侧边缘。
+    -->
+    <div class="flex shrink-0 items-start max-lg:hidden" :class="compact ? 'pt-0' : 'pt-0.5'">
       <input
         type="checkbox"
         :checked="checked"

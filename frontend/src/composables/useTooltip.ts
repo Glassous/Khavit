@@ -16,6 +16,24 @@ const SHOW_DELAY = 220
 const GAP = 8
 const EDGE = 8
 
+/**
+ * 响应式（< lg）下彻底不显示提示：
+ * 触屏没有真正的 hover，点按会顺带触发 mouseenter，提示层反而盖住按钮本身。
+ */
+const DESKTOP_QUERY = '(min-width: 1024px)'
+
+function tooltipAllowed(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return true
+  return window.matchMedia(DESKTOP_QUERY).matches
+}
+
+if (typeof window !== 'undefined' && window.matchMedia) {
+  // 窗口收窄到响应式断点时，把可能已经显示出来的提示一并收掉
+  window.matchMedia(DESKTOP_QUERY).addEventListener('change', (event) => {
+    if (!event.matches) hideTooltip()
+  })
+}
+
 export interface TooltipState {
   text: string
   visible: boolean
@@ -88,7 +106,7 @@ export const vTooltip: Directive<HTMLElement, string | null | undefined> = {
     const meta: TipMeta = {
       text: normalize(binding.value),
       enter: () => {
-        if (!meta.text) return
+        if (!meta.text || !tooltipAllowed()) return
         clearTimer()
         currentEl = el
         timer = window.setTimeout(() => {
