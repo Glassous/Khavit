@@ -39,15 +39,15 @@ const recipients = computed(() => {
 
 <template>
   <div
-    class="unread-bar group relative flex cursor-pointer gap-2.5 border-b border-line/70 px-3 transition-colors duration-150"
+    class="unread-bar group relative flex cursor-pointer border-b border-line/70 px-3 transition-colors duration-150"
     :class="[
       active ? 'bg-brand-ghost' : 'hover:bg-surface-2/70',
       unread ? 'is-unread' : '',
-      compact ? 'py-2' : 'py-2.5',
+      compact ? 'gap-2 py-1.5' : 'gap-2.5 py-2.5',
     ]"
     @click="emit('select', email.id)"
   >
-    <div class="flex shrink-0 items-start pt-0.5">
+    <div class="flex shrink-0 items-start" :class="compact ? 'pt-0' : 'pt-0.5'">
       <input
         type="checkbox"
         :checked="checked"
@@ -60,8 +60,8 @@ const recipients = computed(() => {
     </div>
 
     <span
-      class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white/95"
-      :class="color"
+      class="flex shrink-0 items-center justify-center rounded-full font-semibold text-white/95"
+      :class="[color, compact ? 'h-6 w-6 self-center text-[11px]' : 'mt-0.5 h-8 w-8 text-[12px]']"
     >
       {{ initial }}
     </span>
@@ -77,7 +77,7 @@ const recipients = computed(() => {
         <span class="shrink-0 text-[11.5px] tabular-nums text-ink-3">{{ time }}</span>
       </div>
 
-      <div class="mt-0.5 flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5" :class="compact ? 'mt-0' : 'mt-0.5'">
         <span
           class="min-w-0 flex-1 truncate text-[13px]"
           :class="unread ? 'font-medium text-ink' : 'text-ink-2'"
@@ -103,7 +103,8 @@ const recipients = computed(() => {
         </button>
       </div>
 
-      <p class="mt-0.5 truncate text-[12px] leading-relaxed text-ink-3">
+      <!-- 紧凑模式只留发件人 + 主题两行，一屏能多看近一倍 -->
+      <p v-if="!compact" class="mt-0.5 truncate text-[12px] leading-relaxed text-ink-3">
         <span v-if="email.mailboxIds && Object.keys(email.mailboxIds).length > 1" class="mr-1 text-ink-4">·</span>
         <span v-if="recipients" class="text-ink-4">致 {{ recipients }} · </span>{{ preview || '（无内容摘要）' }}
       </p>

@@ -20,18 +20,20 @@ import AppBadge from '../components/ui/AppBadge.vue'
 import { useAuthStore } from '../stores/auth'
 import { useMailStore } from '../stores/mail'
 import { useTheme } from '../composables/useTheme'
+import { useDensity } from '../composables/useDensity'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { getAccountById, listDomains, setAccountPassword } from '../jmap/admin'
 import { formatBytes } from '../utils/format'
 import { describeError } from '../utils/i18n'
-import { readAllowedImageSenders, readDensity, writeDensity } from '../utils/storage'
+import { readAllowedImageSenders } from '../utils/storage'
 import type { AccountRecord, DomainRecord } from '../jmap/types'
 
 const auth = useAuthStore()
 const mail = useMailStore()
 const router = useRouter()
 const { mode, setMode } = useTheme()
+const { compact, setCompact } = useDensity()
 const { confirm } = useConfirm()
 const toast = useToast()
 
@@ -42,7 +44,6 @@ const password = ref('')
 const confirmPassword = ref('')
 const savingPassword = ref(false)
 const allowedSenders = ref<string[]>(readAllowedImageSenders())
-const compact = ref(readDensity() === 'compact')
 const loadError = ref('')
 
 const quotaBytes = computed(() => account.value?.quotas?.maxDiskQuota ?? 0)
@@ -106,8 +107,7 @@ async function changePassword(): Promise<void> {
 }
 
 function toggleDensity(value: boolean): void {
-  compact.value = value
-  writeDensity(value ? 'compact' : 'comfortable')
+  setCompact(value)
   toast.info(value ? '已切换为紧凑列表' : '已切换为舒适列表')
 }
 

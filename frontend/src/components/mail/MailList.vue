@@ -9,11 +9,14 @@ import { formatNumber, mailboxLabel } from '../../utils/i18n'
 import MailListItem from './MailListItem.vue'
 import AppSkeleton from '../ui/AppSkeleton.vue'
 import AppEmpty from '../ui/AppEmpty.vue'
+import { useDensity } from '../../composables/useDensity'
 
 const mail = useMailStore()
 const auth = useAuthStore()
 const toast = useToast()
 const { confirm } = useConfirm()
+/** 紧凑/舒适密度由设置页控制，这里只负责把状态传下去 */
+const { compact } = useDensity()
 
 const emit = defineEmits<{ select: [id: string] }>()
 
@@ -201,6 +204,7 @@ async function bulkDelete(): Promise<void> {
           :email="email"
           :active="mail.selectedId === email.id"
           :checked="selected.has(email.id)"
+          :compact="compact"
           @select="(id) => emit('select', id)"
           @star="(id, starred) => mail.setStarred(id, starred)"
           @check="toggleCheck"
