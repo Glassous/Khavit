@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Command,
   LogOut,
-  Mail,
   Menu,
   Moon,
   Search,
@@ -14,6 +13,7 @@ import {
   Sun,
   X,
 } from 'lucide-vue-next'
+import BrandMark from '../ui/BrandMark.vue'
 import { useAuthStore } from '../../stores/auth'
 import { useMailStore } from '../../stores/mail'
 import { useTheme } from '../../composables/useTheme'
@@ -105,11 +105,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
   <header
     class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4"
   >
-    <!-- 最左侧：侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
+    <!-- 最左侧：品牌标记（纯图标） -->
+    <RouterLink
+      to="/mail"
+      class="ml-1 flex shrink-0 items-center rounded-lg p-1"
+      aria-label="Khavit 邮箱"
+    >
+      <BrandMark class="h-7 w-7 text-brand" />
+    </RouterLink>
+
+    <!-- 侧栏开关（移动端打开抽屉，桌面端折叠/展开） -->
     <button
       v-if="showSidebarToggle"
       type="button"
-      class="-ml-1 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
+      class="-ml-3 cursor-pointer rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:hidden"
       aria-label="打开菜单"
       @click="emit('toggle-sidebar')"
     >
@@ -118,20 +127,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
     <button
       v-if="showSidebarToggle"
       type="button"
-      class="-ml-1 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
+      class="-ml-3 hidden cursor-pointer items-center justify-center rounded-lg p-2 text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink active:scale-95 lg:flex"
       :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
       :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
       @click="emit('toggle-sidebar')"
     >
       <Menu class="h-[26px] w-[26px]" :stroke-width="2.2" />
     </button>
-
-    <RouterLink to="/mail" class="flex shrink-0 items-center gap-2.5 rounded-lg pr-1">
-      <span class="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand text-white shadow-[0_2px_8px_-2px_rgb(47_91_234/0.6)]">
-        <Mail class="h-4 w-4" />
-      </span>
-      <span class="hidden text-[14.5px] font-semibold tracking-tight text-ink sm:block">Khavit邮局</span>
-    </RouterLink>
 
     <!-- 搜索 -->
     <div class="mx-auto flex w-full max-w-[520px] items-center">

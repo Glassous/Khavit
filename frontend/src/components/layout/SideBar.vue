@@ -99,7 +99,7 @@ async function go(path: string): Promise<void> {
     <div class="px-3 pb-1 pt-4">
       <button
         type="button"
-        class="group flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-brand text-[15px] font-medium text-white shadow-[0_1px_2px_rgb(47_91_234/0.28),0_10px_24px_-14px_rgb(47_91_234/0.9)] transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
+        class="group flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-brand text-[15px] font-medium text-white transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
         :title="collapsed ? '撰写邮件' : undefined"
         @click="compose"
       >
@@ -108,11 +108,15 @@ async function go(path: string): Promise<void> {
           :class="collapsed ? 'h-[22px] w-[22px]' : 'h-[19px] w-[19px]'"
           :stroke-width="2.1"
         />
+        <!--
+          文字宽度必须一起过渡：若展开瞬间文字整块插入，内容宽度突然变大，
+          居中排布会把图标顶到左侧，随后又被拉回中间，看起来就是图标先漂移。
+        -->
         <span
-          class="flex items-center overflow-hidden transition-opacity"
-          :class="collapsed ? 'w-0 opacity-0 duration-100' : 'ml-2 opacity-100 duration-200'"
+          class="flex items-center overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin-left] duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          :class="collapsed ? 'ml-0 max-w-0 opacity-0' : 'ml-2 max-w-[96px] opacity-100'"
         >
-          <span class="truncate">撰写邮件</span>
+          <span>撰写邮件</span>
           <span class="ml-2 rounded border border-white/25 px-1 text-[10px] text-white/70">C</span>
         </span>
       </button>
@@ -133,11 +137,6 @@ async function go(path: string): Promise<void> {
         :title="mailboxLabel(box)"
         @click="select(box)"
       >
-        <span
-          v-if="isActive(box)"
-          class="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand"
-        />
-
         <!-- 图标盒宽度固定，折叠时只放大图标本身，居中位置由行内边距带动 -->
         <span class="relative flex w-7 shrink-0 items-center justify-center">
           <component

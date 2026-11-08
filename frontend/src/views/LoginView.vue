@@ -5,6 +5,7 @@ import { ArrowRight, FlaskConical, KeyRound, Mail } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 import AppButton from '../components/ui/AppButton.vue'
 import AppInput from '../components/ui/AppInput.vue'
+import BrandMark from '../components/ui/BrandMark.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -61,9 +62,7 @@ async function submit(): Promise<void> {
   <div class="flex min-h-full items-center justify-center bg-canvas px-5 py-12">
     <div class="w-full max-w-[380px]">
       <div class="mb-9 flex items-center gap-2.5">
-        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white">
-          <Mail class="h-4.5 w-4.5" />
-        </div>
+        <BrandMark class="h-6 w-6 shrink-0 text-brand" />
         <span class="text-[15px] font-semibold text-ink">Khavit邮局</span>
       </div>
 
