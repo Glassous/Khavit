@@ -143,7 +143,9 @@ useHotkeys([
 
 <template>
   <AppShell @toggle-sidebar="sidebarOpen = !sidebarOpen">
-    <SideBar :open="sidebarOpen" @close="sidebarOpen = false" />
+    <template #sidebar>
+      <SideBar :open="sidebarOpen" @close="sidebarOpen = false" />
+    </template>
 
     <main class="flex min-w-0 flex-1">
       <MailList

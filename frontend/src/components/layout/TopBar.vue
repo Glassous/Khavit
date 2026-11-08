@@ -100,7 +100,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 
 <template>
   <header
-    class="glass relative z-30 flex h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-4"
+    class="relative z-30 flex h-14 shrink-0 items-center gap-3 bg-canvas-deep px-3 sm:px-4"
   >
     <button
       type="button"

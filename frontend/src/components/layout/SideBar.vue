@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Archive,
-  ChevronLeft,
   FileText,
   Inbox,
   PenLine,
@@ -84,49 +83,51 @@ async function go(path: string): Promise<void> {
   />
 
   <aside
-    class="z-40 flex h-full w-[248px] shrink-0 flex-col border-r border-line bg-canvas-deep/60 transition-transform duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:bg-canvas"
+    class="z-40 flex h-full w-[264px] shrink-0 flex-col bg-canvas-deep transition-transform duration-200 ease-[cubic-bezier(0.2,0.8,0.2,1)] max-lg:fixed max-lg:inset-y-0 max-lg:left-0"
     :class="open ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'"
   >
-    <div class="px-3 pb-2 pt-3">
+    <div class="px-3 pb-1 pt-4">
       <button
         type="button"
-        class="group flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-brand text-[13.5px] font-medium text-white shadow-[0_1px_2px_rgb(47_91_234/0.28),0_10px_24px_-14px_rgb(47_91_234/0.9)] transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
+        class="group flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand text-[14px] font-medium text-white shadow-[0_1px_2px_rgb(47_91_234/0.28),0_10px_24px_-14px_rgb(47_91_234/0.9)] transition-all duration-150 hover:bg-brand-strong active:translate-y-[0.5px] dark:hover:bg-brand-soft"
         @click="compose"
       >
-        <PenLine class="h-4 w-4 transition-transform duration-200 group-hover:-rotate-6" />
+        <PenLine
+          class="h-[18px] w-[18px] transition-transform duration-200 group-hover:-rotate-6"
+          :stroke-width="2.1"
+        />
         撰写邮件
         <span class="ml-1 rounded border border-white/25 px-1 text-[10px] text-white/70">C</span>
       </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-2 py-1 scroll-slim" aria-label="邮箱文件夹">
-      <p class="px-2 pb-1.5 pt-2 text-[11px] font-medium uppercase tracking-wider text-ink-4">文件夹</p>
-
+    <nav class="flex-1 overflow-y-auto px-3 py-2 scroll-slim" aria-label="邮箱文件夹">
       <button
         v-for="box in boxes"
         :key="box.id"
         type="button"
-        class="group relative flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13.5px] transition-colors duration-150"
+        class="group relative mb-1 flex w-full cursor-pointer items-center gap-3.5 rounded-[10px] px-3 py-2.5 text-left text-[14px] transition-colors duration-150"
         :class="
           isActive(box)
-            ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(15_21_32/0.04)]'
+            ? 'bg-surface font-medium text-ink shadow-[0_1px_2px_rgb(15_21_32/0.06)]'
             : 'text-ink-2 hover:bg-surface/70 hover:text-ink'
         "
         @click="select(box)"
       >
         <span
           v-if="isActive(box)"
-          class="absolute left-0 top-1/2 h-4 w-[2.5px] -translate-y-1/2 rounded-r-full bg-brand"
+          class="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand"
         />
         <component
           :is="roleIcons[box.role ?? ''] ?? FileText"
-          class="h-4 w-4 shrink-0"
+          class="h-[18px] w-[18px] shrink-0"
+          :stroke-width="2.1"
           :class="isActive(box) ? 'text-brand' : 'text-ink-3 group-hover:text-ink-2'"
         />
         <span class="flex-1 truncate" :title="mailboxLabel(box)">{{ mailboxLabel(box) }}</span>
         <span
           v-if="box.unreadEmails > 0"
-          class="rounded-full px-1.5 py-[1px] text-[11px] font-semibold leading-4"
+          class="rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-4"
           :class="
             box.role === 'junk'
               ? 'bg-amber/12 text-amber'
@@ -140,35 +141,23 @@ async function go(path: string): Promise<void> {
       </button>
     </nav>
 
-    <div class="border-t border-line px-2 py-2">
-      <button
-        type="button"
-        class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-ink-2 transition-colors hover:bg-surface/70 hover:text-ink"
-        @click="go('/settings')"
-      >
-        <Settings class="h-4 w-4 text-ink-3" /> 设置
-      </button>
+    <!-- 底部操作：设置固定在最下方 -->
+    <div class="px-3 pb-3 pt-1">
       <button
         v-if="auth.admin"
         type="button"
-        class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-ink-2 transition-colors hover:bg-surface/70 hover:text-ink"
+        class="mb-1 flex w-full cursor-pointer items-center gap-3.5 rounded-[10px] px-3 py-2.5 text-left text-[14px] text-ink-2 transition-colors hover:bg-surface/70 hover:text-ink"
         @click="go('/admin/domains')"
       >
-        <ShieldCheck class="h-4 w-4 text-ink-3" /> 管理后台
+        <ShieldCheck class="h-[19px] w-[19px] text-ink-3" :stroke-width="2.1" /> 管理后台
       </button>
-
-      <div class="mt-1 flex items-center gap-2 rounded-lg px-2.5 py-2">
-        <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
-        <span class="min-w-0 flex-1 truncate text-[11.5px] text-ink-3">{{ auth.user }}</span>
-        <button
-          type="button"
-          class="cursor-pointer rounded p-0.5 text-ink-4 hover:text-ink lg:hidden"
-          aria-label="收起菜单"
-          @click="emit('close')"
-        >
-          <ChevronLeft class="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <button
+        type="button"
+        class="flex w-full cursor-pointer items-center gap-3.5 rounded-[10px] px-3 py-3 text-left text-[15px] font-medium text-ink-2 transition-colors hover:bg-surface/70 hover:text-ink"
+        @click="go('/settings')"
+      >
+        <Settings class="h-[22px] w-[22px] text-ink-3" :stroke-width="2.3" /> 设置
+      </button>
     </div>
   </aside>
 </template>
